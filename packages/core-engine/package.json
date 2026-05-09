@@ -1,0 +1,11 @@
+{
+  "name": "@shieldguard/core-engine",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Risk scoring and rules (extracted from live services over time).",
+  "type": "module",
+  "main": "./src/index.ts",
+  "scripts": {
+    "build": "echo \"(stub) wire tsc when engine is extracted\""
+  }
+}

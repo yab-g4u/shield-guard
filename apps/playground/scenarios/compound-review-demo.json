@@ -1,0 +1,27 @@
+{
+  "id": "compound-review-demo",
+  "description": "SIM swap + high-value + new device → review (riskScore 82) in dashboard playground",
+  "request": {
+    "phoneNumber": "+254712345678",
+    "transaction": {
+      "amount": 45000,
+      "currency": "KES",
+      "recipient": "unknown_crypto_wallet"
+    },
+    "device": {
+      "id": "dev_new_iphone_17pro",
+      "firstSeenAt": "2026-05-10T12:44:00Z",
+      "ip": "102.219.21.99"
+    }
+  },
+  "simulation": {
+    "simSwap": true,
+    "highValue": true,
+    "newDeviceLogin": true
+  },
+  "expected": {
+    "riskScore": 82,
+    "decision": "review",
+    "fraudSignals": ["device_mismatch", "sim_swap_detected"]
+  }
+}

@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shieldguard-dashboard
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: shieldguard-dashboard
+  template:
+    metadata:
+      labels:
+        app: shieldguard-dashboard
+    spec:
+      containers:
+        - name: dashboard
+          image: shieldguard/dashboard:latest
+          ports:
+            - containerPort: 80

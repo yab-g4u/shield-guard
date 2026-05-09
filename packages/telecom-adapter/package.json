@@ -1,0 +1,8 @@
+{
+  "name": "@shieldguard/telecom-adapter",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Abstraction for CAMARA / carrier SIM and network signals.",
+  "type": "module",
+  "main": "./src/index.ts"
+}

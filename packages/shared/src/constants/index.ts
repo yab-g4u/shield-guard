@@ -1,0 +1,2 @@
+export const DEFAULT_REVIEW_THRESHOLD = 40;
+export const DEFAULT_BLOCK_THRESHOLD = 70;

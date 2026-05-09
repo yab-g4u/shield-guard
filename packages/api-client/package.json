@@ -1,0 +1,8 @@
+{
+  "name": "@shieldguard/api-client",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Internal HTTP client for ShieldGuard APIs (used by dashboard and SDK internals).",
+  "type": "module",
+  "main": "./src/index.ts"
+}

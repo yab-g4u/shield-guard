@@ -1,0 +1,21 @@
+{
+  "id": "baseline-low-risk",
+  "description": "Typical low-risk payment",
+  "request": {
+    "phoneNumber": "+254712345678",
+    "transaction": {
+      "amount": 850.5,
+      "currency": "KES",
+      "recipient": "nairobi_power_co"
+    },
+    "device": {
+      "id": "dev_88219x",
+      "ip": "102.219.21.4"
+    }
+  },
+  "simulation": {
+    "simSwap": false,
+    "highValue": false,
+    "newDeviceLogin": false
+  }
+}
