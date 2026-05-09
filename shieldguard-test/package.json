@@ -10,7 +10,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@shieldguard/sdk": "file:../shieldguard-sdk/shieldguard-sdk-1.0.0.tgz"
+    "@shieldguard/sdk": "file:../shieldguard-sdk"
   },
   "devDependencies": {
     "ts-node": "^10.9.2",

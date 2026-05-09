@@ -12,14 +12,14 @@ export class Client {
   private readonly maxRetries: number;
 
   constructor(config: ShieldConfig) {
-    this.apiKey = config.apiKey;
+    const apiKey = config.apiKey;
+    if (!apiKey || !String(apiKey).trim()) {
+      throw new ShieldAuthError('SHIELDGUARD_KEY is missing or invalid.');
+    }
+    this.apiKey = apiKey;
     this.baseUrl = (config.baseUrl || 'https://api.shieldguard.com').replace(/\/$/, '');
     this.timeout = config.timeout || 10000;
     this.maxRetries = config.maxRetries ?? 3;
-
-    if (!this.apiKey) {
-      throw new ShieldAuthError('SHIELDGUARD_KEY is missing or invalid.');
-    }
   }
 
   /**

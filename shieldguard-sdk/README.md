@@ -60,6 +60,19 @@ try {
 const { ShieldGuard } = require("@shieldguard/sdk");
 ```
 
+### Demo / offline mode (mocked responses)
+
+When the backend is not running—or for pitches and tests—use **`demo: true`** to skip HTTP entirely and receive deterministic, realistic JSON (`id`, `riskScore`, `decision`, `reasons`, `fraudSignals`, `timestamp`). High amounts and optional `metadata` flags nudge risk toward `review` / `block`.
+
+```typescript
+const shield = new ShieldGuard({
+  apiKey: "demo_key",
+  demo: true,
+});
+```
+
+To **call the real API when available** but fall back to the same mock on network failure, use **`fallbackToMock: true`** (without `demo`).
+
 ## Local pack test
 
 ```bash

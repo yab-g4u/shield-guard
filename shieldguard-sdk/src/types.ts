@@ -3,9 +3,9 @@
  */
 export interface ShieldConfig {
   /**
-   * Your ShieldGuard API Key
+   * Your ShieldGuard API Key. Not required when `demo: true`.
    */
-  apiKey: string;
+  apiKey?: string;
   /**
    * The base URL for the ShieldGuard API.
    * Defaults to 'https://api.shieldguard.com'
@@ -21,6 +21,16 @@ export interface ShieldConfig {
    * Defaults to 3
    */
   maxRetries?: number;
+  /**
+   * When true, skips all HTTP calls and returns realistic mocked JSON (demo fixture).
+   * Use for demos, tests, or offline development.
+   */
+  demo?: boolean;
+  /**
+   * When true (and `demo` is false), a failed network request falls back to the same mocked evaluate response
+   * instead of throwing. Useful when the backend may be down but you still want a smooth demo.
+   */
+  fallbackToMock?: boolean;
 }
 
 /**
