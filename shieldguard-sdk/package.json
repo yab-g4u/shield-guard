@@ -1,0 +1,45 @@
+{
+  "name": "@shieldguard/sdk",
+  "version": "1.0.0",
+  "description": "ShieldGuard SDK for fraud detection and transaction risk evaluation",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "module": "dist/index.js",
+  "exports": {
+    ".": {
+      "require": "./dist/index.js",
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "fraud",
+    "risk",
+    "fintech",
+    "security",
+    "sdk",
+    "shieldguard"
+  ],
+  "author": "ShieldGuard Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/shieldguard/sdk"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}

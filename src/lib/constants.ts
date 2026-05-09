@@ -1,0 +1,105 @@
+
+import { NodeCategory, CamaraAPI } from '../types/flow.types';
+
+export const COLORS = {
+  trigger: '#FF8C00',
+  telecom_signal: '#00D4FF',
+  condition: '#FFB800',
+  decision: {
+    ALLOW: '#00FF88',
+    VERIFY: '#FFB800',
+    BLOCK: '#FF4444',
+  },
+  bg: '#0A0F1E',
+  surface: '#131929',
+  border: 'rgba(0, 212, 255, 0.15)',
+};
+
+export const NODE_DEFINITIONS = [
+  {
+    type: 'trigger',
+    label: 'Transaction Initiated',
+    category: 'trigger' as NodeCategory,
+    description: 'Real-time entry point for transaction requests.',
+    icon: 'Zap',
+  },
+  {
+    type: 'sim_swap',
+    label: 'SIM Swap Detection',
+    category: 'telecom_signal' as NodeCategory,
+    camaraApi: 'sim_swap' as CamaraAPI,
+    description: 'Check if the SIM card was recently replaced.',
+    icon: 'Shield',
+  },
+  {
+    type: 'device_status',
+    label: 'Device Status Check',
+    category: 'telecom_signal' as NodeCategory,
+    camaraApi: 'device_status' as CamaraAPI,
+    description: 'Verify if the device is currently reported lost or stolen.',
+    icon: 'Smartphone',
+  },
+  {
+    type: 'number_verify',
+    label: 'Number Verification',
+    category: 'telecom_signal' as NodeCategory,
+    camaraApi: 'number_verify' as CamaraAPI,
+    description: 'Verify the ownership of the provided phone number.',
+    icon: 'Phone',
+  },
+  {
+    type: 'kyc_match',
+    label: 'KYC Match',
+    category: 'telecom_signal' as NodeCategory,
+    camaraApi: 'kyc_match' as CamaraAPI,
+    description: 'Match provided user data against carrier KYC records.',
+    icon: 'UserCheck',
+  },
+  {
+    type: 'location_verify',
+    label: 'Location Verify',
+    category: 'telecom_signal' as NodeCategory,
+    camaraApi: 'location_verify' as CamaraAPI,
+    description: 'Compare transaction location with network presence.',
+    icon: 'MapPin',
+  },
+  {
+    type: 'roaming_status',
+    label: 'Roaming Status',
+    category: 'telecom_signal' as NodeCategory,
+    camaraApi: 'roaming_status' as CamaraAPI,
+    description: 'Check if the device is currently roaming internationally.',
+    icon: 'Globe',
+  },
+  {
+    type: 'condition',
+    label: 'Condition Branch',
+    category: 'condition' as NodeCategory,
+    description: 'Route flow based on specific criteria.',
+    icon: 'GitBranch',
+  },
+  {
+    type: 'allow',
+    label: 'Allow Transaction',
+    category: 'decision' as NodeCategory,
+    decisionType: 'ALLOW',
+    description: 'Approve the transaction and proceed.',
+    icon: 'CheckCircle',
+  },
+  {
+    type: 'verify',
+    label: 'Verify (Step-up)',
+    category: 'decision' as NodeCategory,
+    decisionType: 'VERIFY',
+    description: 'Require additional authentication (OTP/MFA).',
+    icon: 'AlertTriangle',
+  },
+  {
+    type: 'block',
+    label: 'Block Transaction',
+    category: 'decision' as NodeCategory,
+    decisionType: 'BLOCK',
+    description: 'Reject the transaction immediately.',
+    icon: 'XCircle',
+  },
+];
