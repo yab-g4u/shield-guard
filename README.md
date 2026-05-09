@@ -13,6 +13,8 @@ This repository is a full-stack-style **frontend product demo** and tooling surf
 - Explore **analytics** over sandbox evaluation logs (decision mix, risk trend, latency, fraud-signal frequency).
 - Model orchestration flows in a **visual flow builder** and browse **documentation / quickstart** experiences.
 
+This demo specifically targets the hackathon themes for Sub-Saharan Africa by showing how developer-friendly Open Gateway / CAMARA APIs can protect mobile money, onboarding, and digital payments.
+
 > **Note:** Evaluation traffic in the Developer Playground persists **locally** (e.g. browser storage) for demos. Production deployments would wire the same contracts to your ShieldGuard API and analytics backend.
 
 ---
@@ -28,6 +30,18 @@ This repository is a full-stack-style **frontend product demo** and tooling surf
 | **Copilot (optional)** | Gemini-powered explanations when `GEMINI_API_KEY` is configured. |
 
 ---
+
+## CAMARA API Integration
+
+ShieldGuard is built around programmable Open Gateway / CAMARA signal orchestration, modeled on Nokia Network as Code CAMARA APIs available through the Network-as-Code Developer Portal. The project surfaces the following CAMARA-style APIs in the demo and flow builder:
+
+- **SIM Swap** – Detects unauthorized SIM replacement and protects accounts from takeover.
+- **Device Status** – Validates whether a device is trusted, new, or suspicious.
+- **Number Verification** – Confirms active subscriber identity for onboarding and transaction trust.
+- **KYC Match** – Cross-checks customer identity against known profiles and registry data.
+- **Location Verification** – Uses telecom-derived location hints to confirm customer context and geography.
+
+These signals are fused into a single risk evaluation so the user journey shows a secure, reliable experience: enter transaction details, run the evaluation, and receive a transparent decision with explainable fraud signals.
 
 ## Tech Stack
 
@@ -126,6 +140,20 @@ Open the **Developer Playground** from the product navigation. Available workspa
 ### Compound demo scenario
 
 With **SIM swap**, **high-value transaction**, and **new device login** simulations enabled together, the playground returns a fixed **review** outcome with **`riskScore`: 82** and fraud signals such as **`device_mismatch`** and **`sim_swap_detected`**, plus structured explainability for stakeholder demos.
+
+### User journey mapping and secure trust flow
+
+1. User submits transaction or onboarding data through the sandbox UI.
+2. ShieldGuard orchestrates CAMARA signal checks in parallel: SIM Swap, Device Status, Number Verification, and optional KYC/Location verification.
+3. The evaluation engine weights each signal and produces a normalized trust score with a decision of `approve`, `review`, or `block`.
+4. The response includes explainability details so analysts and regulators can see why a transaction was flagged.
+
+Combined API benefits:
+
+- **Better fraud detection** by correlating SIM lifecycle, device trust, and identity signals.
+- **Higher trust** for mobile money transactions and SME onboarding.
+- **Scalable edge** via programmable Open Gateway logic that works across 4G/5G networks.
+- **Transparent security** by returning network-backed evidence instead of opaque rules.
 
 ---
 
