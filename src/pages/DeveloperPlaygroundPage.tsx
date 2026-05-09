@@ -100,9 +100,20 @@ interface ExecutionStep {
   details?: string;
 }
 
+interface ExplainabilityFactor {
+  signal: string;
+  contribution: number;
+  summary: string;
+  evidence: string[];
+}
+
 interface EvaluationResult {
-  decision: 'ALLOW' | 'VERIFY' | 'BLOCK';
-  trustScore: number;
+  id: string;
+  timestamp: string;
+  riskScore: number;
+  decision: 'approve' | 'review' | 'block';
+  fraudSignals: string[];
+  explainability: ExplainabilityFactor[];
   confidence: number;
   reasons: string[];
   signals: {
@@ -111,6 +122,22 @@ interface EvaluationResult {
     locationMatch: number;
     kycMatch: number;
   };
+}
+
+function decisionBadgeTone(decision: string | undefined): 'allow' | 'review' | 'block' | 'none' {
+  const d = (decision || '').toLowerCase();
+  if (d === 'approve' || d === 'allow') return 'allow';
+  if (d === 'review' || d === 'verify') return 'review';
+  if (d === 'block') return 'block';
+  return 'none';
+}
+
+function formatDecisionLabel(decision: string | undefined): string {
+  const d = (decision || '').toLowerCase();
+  if (d === 'approve' || d === 'allow') return 'APPROVE';
+  if (d === 'review' || d === 'verify') return 'REVIEW';
+  if (d === 'block') return 'BLOCK';
+  return decision ? String(decision).toUpperCase() : '—';
 }
 
 // --- Mock Data ---
@@ -277,12 +304,29 @@ const TrustScoreGauge = ({ score }: { score: number }) => {
   );
 };
 
-const RiskBreakdown = ({ signals }: { signals: any }) => {
-  const items = [
-    { name: 'SIM swap detected', value: signals.simSwap === 10 ? 30 : 0, color: 'text-red-400' },
-    { name: 'New device detected', value: signals.deviceTrust < 50 ? 25 : 0, color: 'text-red-400' },
-    { name: 'High transaction amount', value: signals.kycMatch < 100 ? 27 : 0, color: 'text-orange-400' },
-  ].filter(i => i.value > 0);
+const RiskBreakdown = ({
+  riskScore,
+  explainability,
+  signals,
+}: {
+  riskScore: number;
+  explainability?: ExplainabilityFactor[];
+  signals: EvaluationResult['signals'];
+}) => {
+  const itemsFromExplain =
+    explainability?.map((f) => ({
+      name: f.signal.replace(/_/g, ' '),
+      value: f.contribution,
+      color: 'text-orange-400' as const,
+    })) ?? [];
+
+  const itemsFromSignals = [
+    { name: 'SIM swap detected', value: signals.simSwap === 10 ? 30 : 0, color: 'text-red-400' as const },
+    { name: 'New device detected', value: signals.deviceTrust < 50 ? 25 : 0, color: 'text-red-400' as const },
+    { name: 'High transaction amount', value: signals.kycMatch < 100 ? 27 : 0, color: 'text-orange-400' as const },
+  ].filter((i) => i.value > 0);
+
+  const items = itemsFromExplain.length > 0 ? itemsFromExplain : itemsFromSignals;
 
   return (
     <div className="space-y-3">
@@ -295,39 +339,71 @@ const RiskBreakdown = ({ signals }: { signals: any }) => {
         {items.map((item, i) => (
           <div key={i} className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <div className={cn("w-1.5 h-1.5 rounded-full bg-current", item.color)} />
-              <span className="text-[11px] font-bold text-slate-300">{item.name}</span>
+              <div className={cn('w-1.5 h-1.5 rounded-full bg-current', item.color)} />
+              <span className="text-[11px] font-bold text-slate-300 capitalize">{item.name}</span>
             </div>
-            <span className={cn("text-[11px] font-black", item.color)}>+{item.value}</span>
+            <span className={cn('text-[11px] font-black', item.color)}>+{item.value}</span>
           </div>
         ))}
-        {items.length === 0 && <span className="text-[11px] font-medium text-slate-500 italic">No significant risks identified</span>}
+        {items.length === 0 && (
+          <span className="text-[11px] font-medium text-slate-500 italic">No significant risks identified</span>
+        )}
       </div>
       <div className="pt-3 border-t border-slate-800 flex items-center justify-between">
         <span className="text-[11px] font-black text-white uppercase italic">Total Risk Score</span>
-        <span className="text-sm font-black text-white">{100 - (signals.simSwap + signals.deviceTrust + signals.locationMatch + signals.kycMatch) / 4}</span>
+        <span className="text-sm font-black text-white">{riskScore}</span>
       </div>
     </div>
   );
 };
 
-const FraudSignalTags = ({ signals }: { signals: any }) => {
-  const tags = [];
-  if (signals.simSwap === 10) tags.push({ id: 'sim_swap', label: 'sim_swap' });
-  if (signals.deviceTrust < 50) tags.push({ id: 'device_mismatch', label: 'device_mismatch' });
-  if (signals.kycMatch < 100) tags.push({ id: 'amount_anomaly', label: 'amount_anomaly' });
-
+const FraudSignalTags = ({ fraudSignals }: { fraudSignals: string[] }) => {
   return (
     <div className="space-y-3">
-       <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Fraud Signals</h4>
-       <div className="flex flex-wrap gap-2">
-         {tags.map(tag => (
-           <Badge key={tag.id} className="bg-red-500/10 text-red-500 border-red-500/20 text-[9px] font-black uppercase py-1 px-2.5">
-             {tag.label}
-           </Badge>
-         ))}
-         {tags.length === 0 && <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 text-[9px] font-black uppercase py-1 px-2.5">Healthy</Badge>}
-       </div>
+      <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Fraud Signals</h4>
+      <div className="flex flex-wrap gap-2">
+        {fraudSignals.map((label) => (
+          <Badge
+            key={label}
+            className="bg-red-500/10 text-red-500 border-red-500/20 text-[9px] font-black uppercase py-1 px-2.5"
+          >
+            {label}
+          </Badge>
+        ))}
+        {fraudSignals.length === 0 && (
+          <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 text-[9px] font-black uppercase py-1 px-2.5">
+            Healthy
+          </Badge>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const ExplainabilityPanel = ({ factors }: { factors: ExplainabilityFactor[] }) => {
+  if (!factors.length) return null;
+  return (
+    <div className="space-y-4 relative z-10">
+      <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-600">Explainability</h4>
+      <div className="space-y-4">
+        {factors.map((f) => (
+          <div
+            key={f.signal}
+            className="rounded-2xl border border-slate-800 bg-slate-950/80 p-4 space-y-2"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[10px] font-black uppercase tracking-widest text-amber-500/90">{f.signal}</span>
+              <span className="text-[10px] font-black text-slate-500 tabular-nums">+{f.contribution} pts</span>
+            </div>
+            <p className="text-[11px] text-slate-300 leading-relaxed">{f.summary}</p>
+            <ul className="list-disc pl-4 space-y-1 text-[10px] text-slate-500 leading-snug">
+              {f.evidence.map((e, i) => (
+                <li key={i}>{e}</li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
     </div>
   );
 };
@@ -343,6 +419,7 @@ interface ApiKey {
 
 interface SimulationState {
   simSwap: boolean;
+  newDeviceLogin: boolean;
   rootedDevice: boolean;
   highValue: boolean;
   locationMismatch: boolean;
@@ -368,25 +445,41 @@ export const DeveloperPlaygroundPage = ({ onBack }: { onBack: () => void }) => {
   const [env, setEnv] = useState<'test' | 'live'>('test');
   
   const [simulator, setSimulator] = useState<SimulationState>({
-    simSwap: false,
+    simSwap: true,
+    newDeviceLogin: true,
     rootedDevice: false,
-    highValue: false,
+    highValue: true,
     locationMismatch: false,
-    proxyDetected: false
+    proxyDetected: false,
   });
 
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
   const [logs, setLogs] = useState<RequestLog[]>([]);
-  const [requestBody, setRequestBody] = useState(JSON.stringify({
-    phoneNumber: "+254712345678",
-    amount: 1500.00,
-    deviceId: "dev_88219x",
-    location: { city: "Nairobi", country: "KE" }
-  }, null, 2));
+  const [requestBody, setRequestBody] = useState(
+    JSON.stringify(
+      {
+        phoneNumber: '+254712345678',
+        transaction: {
+          amount: 45000.0,
+          currency: 'KES',
+          recipient: 'unknown_crypto_wallet',
+        },
+        device: {
+          id: 'dev_new_iphone_17pro',
+          firstSeenAt: '2026-05-10T12:44:00Z',
+          ip: '102.219.21.99',
+        },
+      },
+      null,
+      2
+    )
+  );
   
   const [lastResult, setLastResult] = useState<EvaluationResult | null>(null);
   const [currentScenario, setCurrentScenario] = useState<Scenario>(SCENARIOS[0]);
-  const [trace, setTrace] = useState<{id: string, time: string, message: string, status: 'success' | 'error' | 'info', latency?: string}[]>([]);
+  const [trace, setTrace] = useState<
+    { id: string; time: string; message: string; status: 'success' | 'error' | 'info' | 'warning'; latency?: string }[]
+  >([]);
   const [aiInsight, setAiInsight] = useState<string | null>(null);
   
   const traceEndRef = useRef<HTMLDivElement>(null);
@@ -409,6 +502,7 @@ export const DeveloperPlaygroundPage = ({ onBack }: { onBack: () => void }) => {
   const calculateRisk = () => {
     let score = 5;
     if (simulator.simSwap) score += 45;
+    if (simulator.newDeviceLogin) score += 28;
     if (simulator.rootedDevice) score += 30;
     if (simulator.locationMismatch) score += 20;
     if (simulator.proxyDetected) score += 15;
@@ -416,13 +510,20 @@ export const DeveloperPlaygroundPage = ({ onBack }: { onBack: () => void }) => {
     return Math.min(100, score);
   };
 
+  const isCompoundFraudDemo =
+    simulator.simSwap && simulator.highValue && simulator.newDeviceLogin;
+
   const handleRunEvaluation = async () => {
     setIsExecuting(true);
     setLastResult(null);
     setAiInsight(null);
     setTrace([]);
 
-    const addTrace = (message: string, status: 'success' | 'error' | 'info' = 'success', latency?: string) => {
+    const addTrace = (
+      message: string,
+      status: 'success' | 'error' | 'info' | 'warning' = 'success',
+      latency?: string
+    ) => {
       setTrace(prev => [...prev, {
         id: Math.random().toString(36).substring(7),
         time: new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }),
@@ -442,46 +543,163 @@ export const DeveloperPlaygroundPage = ({ onBack }: { onBack: () => void }) => {
     await new Promise(r => setTimeout(r, 600));
 
     if (simulator.simSwap) {
-       addTrace("CAMARA Signal Alert: Recent SIM Swap detected (ref: CAM-402)", "error");
+      addTrace('CAMARA Signal Alert: Recent SIM Swap detected (ref: CAM-402)', 'error');
     }
 
-    addTrace("Analyzing Device Integrity: Hardware Attestation Bloom Filter...", "success", "48ms");
-    await new Promise(r => setTimeout(r, 400));
+    if (simulator.highValue) {
+      addTrace('Policy Engine: High-value transfer exceeds warm-trust threshold for this MSISDN', 'warning');
+    }
+
+    addTrace('Analyzing Device Integrity: Hardware Attestation Bloom Filter...', 'success', '48ms');
+    await new Promise((r) => setTimeout(r, 400));
+
+    if (simulator.newDeviceLogin) {
+      addTrace('Device Graph: First-seen device fingerprint with no completed step-up on file', 'warning');
+    }
 
     if (simulator.rootedDevice) {
-       addTrace("Security Violation: Device integrity compromise detected (Rooted/Jailbroken)", "error");
+      addTrace('Security Violation: Device integrity compromise detected (Rooted/Jailbroken)', 'error');
     }
 
-    addTrace("Aggregating multi-source risk variables...");
-    await new Promise(r => setTimeout(r, 300));
+    addTrace('Aggregating multi-source risk variables...');
+    await new Promise((r) => setTimeout(r, 300));
 
     const latency = 800 + Math.random() * 400;
-    const finalScore = calculateRisk();
-    const decision = finalScore > 70 ? 'BLOCK' : finalScore > 40 ? 'VERIFY' : 'ALLOW';
-    
+    const evalId = `sg_eval_${Date.now().toString(36)}`;
+    const evaluatedAt = new Date().toISOString();
+
+    let riskScore: number;
+    let decision: EvaluationResult['decision'];
+    let fraudSignals: string[];
+    let explainability: ExplainabilityFactor[];
+    const reasons: string[] = [];
+
+    if (isCompoundFraudDemo) {
+      riskScore = 82;
+      decision = 'review';
+      fraudSignals = ['device_mismatch', 'sim_swap_detected'];
+      explainability = [
+        {
+          signal: 'device_mismatch',
+          contribution: 38,
+          summary:
+            'The presenting device does not match the last trusted hardware enrollment for this subscriber, amplified by transfer size.',
+          evidence: [
+            'Device ID first seen today; absent from historical fingerprint graph',
+            'Transaction amount in top percentile for this wallet in 30d',
+            'IP / routing cluster inconsistent with usual home registration',
+          ],
+        },
+        {
+          signal: 'sim_swap_detected',
+          contribution: 44,
+          summary:
+            'Carrier-reported SIM lifecycle change is recent and has not been reconciled with a trusted device session before this high-value movement.',
+          evidence: [
+            'SIM profile change observed ~14 minutes before this evaluation',
+            'No successful cold-start binding completed after the swap event',
+            'MNO risk tier elevated for this IMSI range',
+          ],
+        },
+      ];
+      reasons.push(
+        'Compound signals: SIM swap timeline overlaps with unseen device and elevated transaction amount.',
+        'Automated approve would breach policy; route to manual or step-up review queue.'
+      );
+    } else {
+      riskScore = calculateRisk();
+      decision = riskScore > 70 ? 'block' : riskScore > 40 ? 'review' : 'approve';
+      fraudSignals = [];
+      explainability = [];
+      if (simulator.simSwap) {
+        fraudSignals.push('sim_swap_detected');
+        explainability.push({
+          signal: 'sim_swap_detected',
+          contribution: 40,
+          summary: 'Recent SIM change increases account takeover probability.',
+          evidence: ['CAMARA SIM-swap watchlist flag', 'Short window since profile update'],
+        });
+      }
+      if (simulator.newDeviceLogin || simulator.rootedDevice) {
+        fraudSignals.push('device_mismatch');
+        explainability.push({
+          signal: 'device_mismatch',
+          contribution: simulator.rootedDevice ? 35 : 28,
+          summary: simulator.rootedDevice
+            ? 'Device attestation indicates compromised environment.'
+            : 'New device has not completed trust onboarding.',
+          evidence: simulator.rootedDevice
+            ? ['Failed integrity checks', 'Jailbreak / root indicators']
+            : ['First-seen device ID', 'No prior successful auth from this key'],
+        });
+      }
+      if (simulator.highValue) {
+        fraudSignals.push('high_value_transfer');
+        explainability.push({
+          signal: 'high_value_transfer',
+          contribution: 22,
+          summary: 'Amount exceeds velocity and warm-trust thresholds.',
+          evidence: ['Amount vs 30d rolling baseline', 'Recipient risk category'],
+        });
+      }
+      if (simulator.locationMismatch) {
+        fraudSignals.push('geo_velocity_warn');
+        explainability.push({
+          signal: 'geo_velocity_warn',
+          contribution: 18,
+          summary: 'IP-derived location diverges from serving cell footprint.',
+          evidence: ['Tower vs IP geolocation delta', 'Roaming state mismatch'],
+        });
+      }
+      if (simulator.proxyDetected) {
+        fraudSignals.push('proxy_or_vpn');
+        explainability.push({
+          signal: 'proxy_or_vpn',
+          contribution: 15,
+          summary: 'Exit traffic characteristics suggest anonymization.',
+          evidence: ['ASN classified as proxy/datacenter', 'TLS fingerprint anomalies'],
+        });
+      }
+      fraudSignals = [...new Set(fraudSignals)];
+      if (simulator.simSwap) reasons.push('CAMARA: Recent SIM swap detected (14m ago)');
+      if (simulator.rootedDevice)
+        reasons.push('Device Security: Hardware attestation failed (Rooted/Jailbroken)');
+      if (simulator.newDeviceLogin && !simulator.rootedDevice)
+        reasons.push('Device: New login from unseen hardware before trust cooldown');
+      if (simulator.highValue) reasons.push('Amount: High-value transfer vs recent behavior');
+      if (simulator.locationMismatch)
+        reasons.push('Geo: Mismatch between IP location and carrier tower data');
+      if (simulator.proxyDetected) reasons.push('Network: Proxy or high-risk exit node');
+      if (reasons.length === 0) reasons.push('All carrier signals verified as trusted');
+    }
+
     const result: EvaluationResult = {
+      id: evalId,
+      timestamp: evaluatedAt,
+      riskScore,
       decision,
-      trustScore: 100 - finalScore,
+      fraudSignals,
+      explainability,
       confidence: 0.98,
-      reasons: [],
+      reasons,
       signals: {
         simSwap: simulator.simSwap ? 10 : 100,
-        deviceTrust: simulator.rootedDevice ? 20 : 95,
+        deviceTrust:
+          simulator.rootedDevice || simulator.newDeviceLogin ? 20 : 95,
         locationMatch: simulator.locationMismatch ? 40 : 100,
-        kycMatch: 100
-      }
+        kycMatch: simulator.highValue ? 55 : 100,
+      },
     };
-
-    if (simulator.simSwap) result.reasons.push("CAMARA: Recent SIM swap detected (14m ago)");
-    if (simulator.rootedDevice) result.reasons.push("Device Security: Hardware attestation failed (Rooted/Jailbroken)");
-    if (simulator.locationMismatch) result.reasons.push("Geo: Mismatch between IP location and carrier tower data");
-    if (result.reasons.length === 0) result.reasons.push("All carrier signals verified as trusted");
 
     setLastResult(result);
     setIsExecuting(false);
 
     let parsedBody = {};
-    try { parsedBody = JSON.parse(requestBody); } catch (e) { parsedBody = { error: "Invalid JSON" }; }
+    try {
+      parsedBody = JSON.parse(requestBody);
+    } catch {
+      parsedBody = { error: 'Invalid JSON' };
+    }
 
     const newLog: RequestLog = {
       id: Math.random().toString(36).substring(7),
@@ -492,18 +710,17 @@ export const DeveloperPlaygroundPage = ({ onBack }: { onBack: () => void }) => {
       payload: parsedBody,
       response: result,
       latency: Math.round(latency),
-      score: 100 - finalScore
+      score: riskScore,
     };
     const updatedLogs = [newLog, ...logs].slice(0, 50);
     setLogs(updatedLogs);
     localStorage.setItem('sg_logs', JSON.stringify(updatedLogs));
 
-    setIsAiLoading(true);
-    const insight = await geminiService.analyzeSignal("Evaluation", decision, { score: 100 - finalScore, reasons: result.reasons });
-    setAiInsight(insight);
-    setIsAiLoading(false);
-    
-    toast.success(`Evaluation Complete: ${decision}`);
+    void geminiService
+      .analyzeSignal('Evaluation', decision, { riskScore, reasons: result.reasons, fraudSignals })
+      .then(setAiInsight);
+
+    toast.success(`Evaluation complete: ${formatDecisionLabel(decision)}`);
   };
 
   const copyToClipboard = (text: string) => {
@@ -735,11 +952,21 @@ export const DeveloperPlaygroundPage = ({ onBack }: { onBack: () => void }) => {
                                          <td className="px-6 py-5 text-[11px] font-mono text-slate-300">{log.timestamp}</td>
                                          <td className="px-6 py-5 text-[11px] text-slate-300">{log.path}</td>
                                          <td className="px-6 py-5 text-center">
-                                            <Badge variant="outline" className={cn(
-                                              "px-3 py-1 text-[9px] font-black uppercase rounded-full",
-                                              log.response.decision === 'ALLOW' ? 'text-emerald-400 border-emerald-400/20 bg-emerald-500/10' : log.response.decision === 'BLOCK' ? 'text-red-400 border-red-400/20 bg-red-500/10' : 'text-amber-400 border-amber-400/20 bg-amber-500/10'
-                                            )}>
-                                               {log.response.decision}
+                                            <Badge
+                                               variant="outline"
+                                               className={cn(
+                                                  'px-3 py-1 text-[9px] font-black uppercase rounded-full',
+                                                  decisionBadgeTone(log.response.decision) === 'allow' &&
+                                                     'text-emerald-400 border-emerald-400/20 bg-emerald-500/10',
+                                                  decisionBadgeTone(log.response.decision) === 'review' &&
+                                                     'text-amber-400 border-amber-400/20 bg-amber-500/10',
+                                                  decisionBadgeTone(log.response.decision) === 'block' &&
+                                                     'text-red-400 border-red-400/20 bg-red-500/10',
+                                                  decisionBadgeTone(log.response.decision) === 'none' &&
+                                                     'text-slate-400 border-slate-700/50'
+                                               )}
+                                            >
+                                               {formatDecisionLabel(log.response.decision)}
                                             </Badge>
                                          </td>
                                          <td className="px-6 py-5 text-center text-[11px] text-slate-400">{log.latency}ms</td>
@@ -764,6 +991,15 @@ export const DeveloperPlaygroundPage = ({ onBack }: { onBack: () => void }) => {
 
                    {activeTab === 'playground' && (
                      <div className="max-w-[1600px] mx-auto space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                  <p className="text-[11px] text-slate-400 leading-relaxed max-w-3xl">
+                    For example, here we&apos;re simulating a{' '}
+                    <span className="text-slate-200 font-bold">SIM swap attack</span>, a{' '}
+                    <span className="text-slate-200 font-bold">high-value transaction</span>, and a{' '}
+                    <span className="text-slate-200 font-bold">new device login</span>. Click{' '}
+                    <span className="text-emerald-400 font-black uppercase tracking-wide">Run Evaluation</span> — once the
+                    request is evaluated, ShieldGuard returns a live risk decision with explainability in the response
+                    JSON and the signal panel.
+                  </p>
                   {/* API Command Bar */}
                   <div className="flex items-center gap-4">
                      <div className="flex-1 flex items-center bg-slate-900 border border-slate-800 rounded-2xl p-2.5 gap-4 shadow-2xl">
@@ -790,7 +1026,7 @@ export const DeveloperPlaygroundPage = ({ onBack }: { onBack: () => void }) => {
                               className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs px-10 rounded-xl h-11 gap-3 shadow-xl shadow-emerald-500/10 transition-all hover:scale-[1.02] active:scale-95"
                            >
                               {isExecuting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4 fill-current" />}
-                              Send Request
+                              Run Evaluation
                            </Button>
                         </div>
                      </div>
@@ -865,31 +1101,123 @@ export const DeveloperPlaygroundPage = ({ onBack }: { onBack: () => void }) => {
                            <div className="space-y-6">
                               <div className="flex items-center justify-between px-2">
                                  <h3 className="text-[10px] font-black text-slate-600 uppercase tracking-[0.2em]">Simulation Scenarios</h3>
-                                 <button onClick={() => setSimulator({ simSwap: false, rootedDevice: false, highValue: false, locationMismatch: false, proxyDetected: false })} className="text-[9px] font-black text-blue-400 uppercase tracking-widest hover:text-blue-300">Clear All Overrides</button>
+                                 <button
+                                    onClick={() =>
+                                       setSimulator({
+                                          simSwap: false,
+                                          newDeviceLogin: false,
+                                          rootedDevice: false,
+                                          highValue: false,
+                                          locationMismatch: false,
+                                          proxyDetected: false,
+                                       })
+                                    }
+                                    className="text-[9px] font-black text-blue-400 uppercase tracking-widest hover:text-blue-300"
+                                 >
+                                    Clear All Overrides
+                                 </button>
                               </div>
-                              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
                                  {[
-                                   { id: 'normal', name: 'Standard Transaction', risk: 'Low', color: '#10b981', action: () => setSimulator({ simSwap: false, rootedDevice: false, highValue: false, locationMismatch: false, proxyDetected: false }) },
-                                   { id: 'sim-swap', name: 'Account Takeover', risk: 'Critical', color: '#ef4444', active: simulator.simSwap, action: () => setSimulator(p => ({ ...p, simSwap: !p.simSwap })) },
-                                   { id: 'new-device', name: 'Fresh Enrollment', risk: 'Medium', color: '#eab308', active: simulator.rootedDevice, action: () => setSimulator(p => ({ ...p, rootedDevice: !p.rootedDevice })) },
-                                   { id: 'high-amount', name: 'Velocity Spike', risk: 'High', color: '#ef4444', active: simulator.highValue, action: () => setSimulator(p => ({ ...p, highValue: !p.highValue })) },
-                                 ].map((preset) => (
-                                   <div 
-                                     key={preset.id} 
-                                     onClick={preset.action}
-                                     className={cn(
-                                        "p-6 rounded-[2rem] bg-slate-900 border transition-all cursor-pointer hover:bg-slate-800 group relative overflow-hidden",
-                                        preset.active ? "border-emerald-500 shadow-[0_0_30px_rgba(16,185,129,0.1)]" : "border-slate-800 hover:border-slate-700"
-                                     )}
-                                   >
-                                        <div className="flex items-center justify-between mb-4 relative z-10">
-                                           <div className="text-[13px] font-black text-white leading-tight uppercase italic tracking-tight">{preset.name}</div>
-                                           {preset.active && <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_10px_#10b981]" />}
-                                        </div>
-                                        <div className="text-[9px] font-black uppercase tracking-[0.2em] relative z-10" style={{ color: preset.color }}>{preset.risk} Impact</div>
-                                        <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                                   </div>
-                                 ))}
+                                    {
+                                       id: 'normal',
+                                       name: 'Standard Transaction',
+                                       risk: 'Low',
+                                       color: '#10b981',
+                                       action: () =>
+                                          setSimulator({
+                                             simSwap: false,
+                                             newDeviceLogin: false,
+                                             rootedDevice: false,
+                                             highValue: false,
+                                             locationMismatch: false,
+                                             proxyDetected: false,
+                                          }),
+                                    },
+                                    {
+                                       id: 'sim-swap',
+                                       name: 'SIM swap attack',
+                                       risk: 'Critical',
+                                       color: '#ef4444',
+                                       action: () => setSimulator((p) => ({ ...p, simSwap: !p.simSwap })),
+                                    },
+                                    {
+                                       id: 'new-device',
+                                       name: 'New device login',
+                                       risk: 'High',
+                                       color: '#eab308',
+                                       action: () => setSimulator((p) => ({ ...p, newDeviceLogin: !p.newDeviceLogin })),
+                                    },
+                                    {
+                                       id: 'high-amount',
+                                       name: 'High-value txn',
+                                       risk: 'High',
+                                       color: '#f97316',
+                                       action: () => setSimulator((p) => ({ ...p, highValue: !p.highValue })),
+                                    },
+                                    {
+                                       id: 'demo-stack',
+                                       name: 'Full demo (3 signals)',
+                                       risk: 'Review',
+                                       color: '#a855f7',
+                                       action: () =>
+                                          setSimulator({
+                                             simSwap: true,
+                                             newDeviceLogin: true,
+                                             highValue: true,
+                                             rootedDevice: false,
+                                             locationMismatch: false,
+                                             proxyDetected: false,
+                                          }),
+                                    },
+                                 ].map((preset) => {
+                                    const highlighted =
+                                       preset.id === 'normal'
+                                          ? !simulator.simSwap &&
+                                            !simulator.newDeviceLogin &&
+                                            !simulator.highValue &&
+                                            !simulator.rootedDevice &&
+                                            !simulator.locationMismatch &&
+                                            !simulator.proxyDetected
+                                          : preset.id === 'sim-swap'
+                                            ? simulator.simSwap
+                                            : preset.id === 'new-device'
+                                              ? simulator.newDeviceLogin
+                                              : preset.id === 'high-amount'
+                                                ? simulator.highValue
+                                                : preset.id === 'demo-stack'
+                                                  ? isCompoundFraudDemo
+                                                  : false;
+
+                                    return (
+                                       <div
+                                          key={preset.id}
+                                          onClick={preset.action}
+                                          className={cn(
+                                             'p-6 rounded-[2rem] bg-slate-900 border transition-all cursor-pointer hover:bg-slate-800 group relative overflow-hidden',
+                                             highlighted
+                                                ? 'border-emerald-500 shadow-[0_0_30px_rgba(16,185,129,0.1)]'
+                                                : 'border-slate-800 hover:border-slate-700'
+                                          )}
+                                       >
+                                          <div className="flex items-center justify-between mb-4 relative z-10">
+                                             <div className="text-[13px] font-black text-white leading-tight uppercase italic tracking-tight">
+                                                {preset.name}
+                                             </div>
+                                             {highlighted && (
+                                                <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_10px_#10b981]" />
+                                             )}
+                                          </div>
+                                          <div
+                                             className="text-[9px] font-black uppercase tracking-[0.2em] relative z-10"
+                                             style={{ color: preset.color }}
+                                          >
+                                             {preset.risk} Impact
+                                          </div>
+                                          <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                                       </div>
+                                    );
+                                 })}
                               </div>
                            </div>
 
@@ -898,10 +1226,15 @@ export const DeveloperPlaygroundPage = ({ onBack }: { onBack: () => void }) => {
                               <div className="flex flex-wrap gap-10">
                                  {[
                                    { id: 'simSwap', label: 'SIM Shadowing', state: simulator.simSwap },
+                                   {
+                                      id: 'newDeviceLogin',
+                                      label: 'New device login',
+                                      state: simulator.newDeviceLogin,
+                                   },
                                    { id: 'locationMismatch', label: 'Geo Velocity', state: simulator.locationMismatch },
                                    { id: 'rootedDevice', label: 'Compromised ENV', state: simulator.rootedDevice },
                                    { id: 'proxyDetected', label: 'Tor Exit Node', state: simulator.proxyDetected },
-                                   { id: 'highValue', label: 'Limit Excess', state: simulator.highValue }
+                                   { id: 'highValue', label: 'Limit Excess', state: simulator.highValue },
                                  ].map((toggle) => (
                                    <div key={toggle.id} className="flex items-stretch gap-4 group cursor-pointer" onClick={() => setSimulator(p => ({ ...p, [toggle.id]: !toggle.state }))}>
                                       <div className={cn(
@@ -937,15 +1270,22 @@ export const DeveloperPlaygroundPage = ({ onBack }: { onBack: () => void }) => {
                            </div>
 
                            <div className="relative z-10 flex flex-col items-center py-4">
-                              <TrustScoreGauge score={lastResult ? 100 - lastResult.trustScore : 0} />
+                              <TrustScoreGauge score={lastResult ? lastResult.riskScore : 0} />
                               <div className="mt-8 flex flex-col items-center gap-4">
-                                 <div className={cn(
-                                    "text-[12px] font-black uppercase tracking-[0.3em] italic border-2 px-8 py-2.5 rounded-2xl shadow-lg transition-all",
-                                    (lastResult?.decision === 'ALLOW') ? "text-emerald-500 border-emerald-500/20 bg-emerald-500/5 shadow-emerald-500/10" : 
-                                    (lastResult?.decision === 'BLOCK') ? "text-red-500 border-red-500/20 bg-red-500/5 shadow-red-500/10" :
-                                    "text-slate-600 border-slate-800 bg-slate-800/20"
-                                 )}>
-                                    {lastResult?.decision || 'No Decision'}
+                                 <div
+                                    className={cn(
+                                      'text-[12px] font-black uppercase tracking-[0.3em] italic border-2 px-8 py-2.5 rounded-2xl shadow-lg transition-all',
+                                      decisionBadgeTone(lastResult?.decision) === 'allow' &&
+                                        'text-emerald-500 border-emerald-500/20 bg-emerald-500/5 shadow-emerald-500/10',
+                                      decisionBadgeTone(lastResult?.decision) === 'review' &&
+                                        'text-amber-400 border-amber-500/20 bg-amber-500/5 shadow-amber-500/10',
+                                      decisionBadgeTone(lastResult?.decision) === 'block' &&
+                                        'text-red-500 border-red-500/20 bg-red-500/5 shadow-red-500/10',
+                                      decisionBadgeTone(lastResult?.decision) === 'none' &&
+                                        'text-slate-600 border-slate-800 bg-slate-800/20'
+                                    )}
+                                 >
+                                    {lastResult ? formatDecisionLabel(lastResult.decision) : 'No Decision'}
                                  </div>
                                  {lastResult && (
                                    <div className="flex items-center gap-2">
@@ -956,13 +1296,30 @@ export const DeveloperPlaygroundPage = ({ onBack }: { onBack: () => void }) => {
                            </div>
 
                            <div className="pt-10 border-t border-slate-800/50 relative z-10">
-                              <RiskBreakdown signals={lastResult ? lastResult.signals : { simSwap: 100, deviceTrust: 100, locationMatch: 100, kycMatch: 100 }} />
+                              <RiskBreakdown
+                                 riskScore={lastResult?.riskScore ?? 0}
+                                 explainability={lastResult?.explainability}
+                                 signals={
+                                    lastResult?.signals ?? {
+                                       simSwap: 100,
+                                       deviceTrust: 100,
+                                       locationMatch: 100,
+                                       kycMatch: 100,
+                                    }
+                                 }
+                              />
                            </div>
 
                            <div className="space-y-6 relative z-10">
                               <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-600">Heuristic Signals</h4>
-                              <FraudSignalTags signals={lastResult ? lastResult.signals : {}} />
+                              <FraudSignalTags fraudSignals={lastResult?.fraudSignals ?? []} />
                            </div>
+
+                           {lastResult && lastResult.explainability.length > 0 && (
+                              <div className="pt-10 border-t border-slate-800/50">
+                                 <ExplainabilityPanel factors={lastResult.explainability} />
+                              </div>
+                           )}
 
                            <div className="pt-10 border-t border-slate-800/50 space-y-8 relative z-10">
                               <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-600">Orchestration Steps</h4>
@@ -1028,13 +1385,21 @@ export const DeveloperPlaygroundPage = ({ onBack }: { onBack: () => void }) => {
                                       <span className="text-[14px] font-black text-white italic group-hover:scale-125 transition-transform inline-block drop-shadow-[0_0_10px_rgba(255,255,255,0.2)]">{log.score}</span>
                                    </td>
                                    <td className="px-10 py-6 text-center">
-                                      <Badge variant="outline" className={cn(
-                                        "px-4 py-1.5 text-[9px] font-black uppercase rounded-xl border-2 transition-all",
-                                        log.response.decision === 'ALLOW' ? "text-emerald-500 border-emerald-500/20 bg-emerald-500/5 group-hover:bg-emerald-500/10" : 
-                                        log.response.decision === 'BLOCK' ? "text-red-500 border-red-500/20 bg-red-500/5 group-hover:bg-red-500/10" : 
-                                        "text-yellow-500 border-yellow-500/20 bg-yellow-500/5 group-hover:bg-yellow-500/10"
-                                      )}>
-                                         {log.response.decision}
+                                      <Badge
+                                         variant="outline"
+                                         className={cn(
+                                            'px-4 py-1.5 text-[9px] font-black uppercase rounded-xl border-2 transition-all',
+                                            decisionBadgeTone(log.response.decision) === 'allow' &&
+                                               'text-emerald-500 border-emerald-500/20 bg-emerald-500/5 group-hover:bg-emerald-500/10',
+                                            decisionBadgeTone(log.response.decision) === 'review' &&
+                                               'text-amber-400 border-amber-500/20 bg-amber-500/5 group-hover:bg-amber-500/10',
+                                            decisionBadgeTone(log.response.decision) === 'block' &&
+                                               'text-red-500 border-red-500/20 bg-red-500/5 group-hover:bg-red-500/10',
+                                            decisionBadgeTone(log.response.decision) === 'none' &&
+                                               'text-slate-500 border-slate-700'
+                                         )}
+                                      >
+                                         {formatDecisionLabel(log.response.decision)}
                                       </Badge>
                                    </td>
                                    <td className="px-10 py-6 text-center text-[11px] font-black text-slate-500 tabular-nums">{log.latency}ms</td>
