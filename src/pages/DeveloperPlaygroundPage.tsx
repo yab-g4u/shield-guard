@@ -31,7 +31,11 @@ import {
   Plus,
   ChevronDown,
   Fingerprint,
-  ArrowUpRight
+  ArrowUpRight,
+  LineChart as LineChartIcon,
+  TrendingUp,
+  Timer,
+  Target,
 } from 'lucide-react';
 import { Button, buttonVariants } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
@@ -55,16 +59,25 @@ import {
   DropdownMenuSeparator,
 } from '../components/ui/dropdown-menu';
 import Editor from '@monaco-editor/react';
-import { 
-  ResponsiveContainer, 
-  RadarChart, 
-  PolarGrid, 
-  PolarAngleAxis, 
-  PolarRadiusAxis, 
+import {
+  ResponsiveContainer,
+  RadarChart,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
   Radar,
   PieChart,
   Pie,
-  Cell
+  Cell,
+  BarChart,
+  Bar,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
 } from 'recharts';
 import { gsap } from 'gsap';
 import { toast } from 'sonner';
@@ -208,11 +221,22 @@ const API_GROUPS = [
     items: [
       { id: 'overview', name: 'Overview', icon: <BarChart3 className="w-4 h-4" /> },
       { id: 'playground', name: 'Playground', icon: <Terminal className="w-4 h-4" /> },
+      { id: 'analytics', name: 'Analytics', icon: <LineChartIcon className="w-4 h-4" /> },
       { id: 'keys', name: 'API Keys', icon: <Key className="w-4 h-4" /> },
       { id: 'logs', name: 'Logs', icon: <History className="w-4 h-4" /> },
-    ]
-  }
+    ],
+  },
 ];
+
+const chartTooltipProps = {
+  contentStyle: {
+    backgroundColor: '#0f172a',
+    border: '1px solid #1e293b',
+    borderRadius: '12px',
+    fontSize: '11px',
+  },
+  labelStyle: { color: '#94a3b8' },
+};
 
 const UsageCard = () => (
   <div className="mx-4 mt-auto mb-6 p-4 rounded-xl bg-slate-900 border border-slate-800">
@@ -439,7 +463,9 @@ interface RequestLog {
 }
 
 export const DeveloperPlaygroundPage = ({ onBack }: { onBack: () => void }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'playground' | 'keys' | 'logs'>('playground');
+  const [activeTab, setActiveTab] = useState<
+    'overview' | 'playground' | 'analytics' | 'keys' | 'logs'
+  >('playground');
   const [activeEndpoint, setActiveEndpoint] = useState('POST /v1/evaluate');
   const [isExecuting, setIsExecuting] = useState(false);
   const [env, setEnv] = useState<'test' | 'live'>('test');
@@ -498,6 +524,66 @@ export const DeveloperPlaygroundPage = ({ onBack }: { onBack: () => void }) => {
     }
     if (savedLogs) setLogs(JSON.parse(savedLogs));
   }, []);
+
+  const analyticsSnapshot = useMemo(() => {
+    const chronological = [...logs].reverse();
+    const n = logs.length;
+    let approve = 0;
+    let review = 0;
+    let block = 0;
+    let riskSum = 0;
+    let latSum = 0;
+    const signalCount: Record<string, number> = {};
+
+    for (const log of logs) {
+      const tone = decisionBadgeTone(log.response?.decision);
+      if (tone === 'allow') approve += 1;
+      else if (tone === 'review') review += 1;
+      else if (tone === 'block') block += 1;
+      riskSum += log.score;
+      latSum += log.latency;
+      const fs = log.response?.fraudSignals;
+      if (Array.isArray(fs)) {
+        for (const s of fs) {
+          signalCount[s] = (signalCount[s] || 0) + 1;
+        }
+      }
+    }
+
+    const trend = chronological.slice(-24).map((log, i) => ({
+      idx: String(i + 1),
+      risk: log.score,
+      latency: log.latency,
+      decision: formatDecisionLabel(log.response?.decision),
+    }));
+
+    const topSignals = Object.entries(signalCount)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([name, count]) => ({ name: name.replace(/_/g, ' '), raw: name, count }));
+
+    let decisionMix = [
+      { name: 'Approve', value: approve, color: '#10b981' },
+      { name: 'Review', value: review, color: '#fbbf24' },
+      { name: 'Block', value: block, color: '#ef4444' },
+    ].filter((x) => x.value > 0);
+
+    if (n > 0 && decisionMix.length === 0) {
+      decisionMix = [{ name: 'Recorded', value: n, color: '#64748b' }];
+    }
+
+    return {
+      total: n,
+      approve,
+      review,
+      block,
+      avgRisk: n ? Math.round(riskSum / n) : 0,
+      avgLatency: n ? Math.round(latSum / n) : 0,
+      decisionMix,
+      trend,
+      topSignals,
+    };
+  }, [logs]);
 
   const calculateRisk = () => {
     let score = 5;
@@ -845,7 +931,17 @@ export const DeveloperPlaygroundPage = ({ onBack }: { onBack: () => void }) => {
         <div className="flex-1 flex flex-col bg-[#020617] overflow-hidden">
            <div className="h-14 flex items-center justify-between px-8 border-b border-slate-800/40 bg-[#020617] shrink-0 z-20">
               <div className="flex items-center gap-4 text-[10px] uppercase tracking-[0.3em] font-black text-slate-500">
-                 <span>{activeTab === 'overview' ? 'Overview' : activeTab === 'playground' ? 'API Playground' : activeTab === 'keys' ? 'API Keys' : 'Request Logs'}</span>
+                 <span>
+                    {activeTab === 'overview'
+                       ? 'Overview'
+                       : activeTab === 'playground'
+                         ? 'API Playground'
+                         : activeTab === 'analytics'
+                           ? 'Analytics'
+                           : activeTab === 'keys'
+                             ? 'API Keys'
+                             : 'Request Logs'}
+                 </span>
               </div>
               <div className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">Sandbox environment</div>
            </div>
@@ -883,6 +979,7 @@ export const DeveloperPlaygroundPage = ({ onBack }: { onBack: () => void }) => {
                               </div>
                               <div className="flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4 pt-1">
                                  <Button onClick={() => setActiveTab('playground')} className="h-12 sm:h-14 w-full sm:w-auto min-h-[48px] rounded-xl sm:rounded-2xl bg-emerald-500 text-slate-950 font-black uppercase tracking-[0.2em] shrink-0">Open Playground</Button>
+                                 <Button variant="outline" onClick={() => setActiveTab('analytics')} className="h-12 sm:h-14 w-full sm:w-auto min-h-[48px] rounded-xl sm:rounded-2xl border-white/10 text-slate-200 uppercase tracking-[0.2em] shrink-0">View Analytics</Button>
                                  <Button variant="outline" onClick={() => setActiveTab('keys')} className="h-12 sm:h-14 w-full sm:w-auto min-h-[48px] rounded-xl sm:rounded-2xl border-white/10 text-slate-200 uppercase tracking-[0.2em] shrink-0">Manage API Keys</Button>
                               </div>
                            </div>
@@ -921,6 +1018,196 @@ export const DeveloperPlaygroundPage = ({ onBack }: { onBack: () => void }) => {
                                  </div>
                               ))}
                            </div>
+                        </div>
+                     </div>
+                   )}
+
+                   {activeTab === 'analytics' && (
+                     <div className="max-w-7xl mx-auto space-y-8">
+                        <div className="rounded-[2rem] sm:rounded-[2.5rem] bg-slate-900 border border-slate-800 p-6 sm:p-10 shadow-[0_40px_80px_rgba(0,0,0,0.45)]">
+                           <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-8">
+                              <div>
+                                 <p className="text-[10px] uppercase tracking-[0.3em] text-slate-500 font-black">
+                                    Evaluation analytics
+                                 </p>
+                                 <h2 className="mt-3 text-2xl sm:text-3xl font-black text-white leading-tight">
+                                    Sandbox metrics from your playground runs
+                                 </h2>
+                                 <p className="mt-2 text-sm text-slate-400 max-w-2xl leading-relaxed">
+                                    Charts aggregate data from stored request logs (local session). Run evaluations in the
+                                    Playground to populate decision mix, risk trend, latency, and fraud-signal frequency.
+                                 </p>
+                              </div>
+                              <Button
+                                 variant="outline"
+                                 className="shrink-0 rounded-2xl border-white/10 text-slate-200 uppercase tracking-[0.2em] text-[10px] font-black h-11"
+                                 onClick={() => setActiveTab('playground')}
+                              >
+                                 Run evaluations
+                              </Button>
+                           </div>
+
+                           {analyticsSnapshot.total === 0 ? (
+                              <div className="rounded-[2rem] border border-dashed border-slate-700 bg-slate-950/50 py-24 text-center">
+                                 <LineChartIcon className="w-12 h-12 text-slate-600 mx-auto mb-4" />
+                                 <p className="text-sm font-bold text-slate-400">No evaluation data yet</p>
+                                 <p className="text-[11px] text-slate-600 mt-2 max-w-md mx-auto">
+                                    Execute at least one evaluation in the Playground to unlock decision distribution,
+                                    risk trends, and signal analytics.
+                                 </p>
+                              </div>
+                           ) : (
+                              <>
+                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                                    {[
+                                       {
+                                          label: 'Total evaluations',
+                                          value: analyticsSnapshot.total,
+                                          icon: <Activity className="w-4 h-4 text-emerald-500" />,
+                                       },
+                                       {
+                                          label: 'Avg risk score',
+                                          value: analyticsSnapshot.avgRisk,
+                                          icon: <Target className="w-4 h-4 text-amber-500" />,
+                                       },
+                                       {
+                                          label: 'Avg latency',
+                                          value: `${analyticsSnapshot.avgLatency} ms`,
+                                          icon: <Timer className="w-4 h-4 text-blue-400" />,
+                                       },
+                                       {
+                                          label: 'Review rate',
+                                          value:
+                                             analyticsSnapshot.total > 0
+                                                ? `${Math.round((analyticsSnapshot.review / analyticsSnapshot.total) * 100)}%`
+                                                : '0%',
+                                          icon: <TrendingUp className="w-4 h-4 text-violet-400" />,
+                                       },
+                                    ].map((kpi) => (
+                                       <div
+                                          key={kpi.label}
+                                          className="rounded-2xl border border-slate-800 bg-slate-950 p-5 flex flex-col gap-3"
+                                       >
+                                          <div className="flex items-center justify-between gap-2">
+                                             <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                                                {kpi.label}
+                                             </span>
+                                             {kpi.icon}
+                                          </div>
+                                          <span className="text-2xl font-black text-white tabular-nums">{kpi.value}</span>
+                                       </div>
+                                    ))}
+                                 </div>
+
+                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                                    <div className="rounded-[2rem] border border-slate-800 bg-slate-950 p-6 min-h-[320px]">
+                                       <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-4">
+                                          Decision distribution
+                                       </h3>
+                                       <div className="h-[260px] w-full min-w-0">
+                                          <ResponsiveContainer width="100%" height="100%">
+                                             <PieChart>
+                                                <Pie
+                                                   data={analyticsSnapshot.decisionMix}
+                                                   dataKey="value"
+                                                   nameKey="name"
+                                                   cx="50%"
+                                                   cy="50%"
+                                                   innerRadius={56}
+                                                   outerRadius={88}
+                                                   paddingAngle={2}
+                                                >
+                                                   {analyticsSnapshot.decisionMix.map((entry, i) => (
+                                                      <Cell key={i} fill={entry.color} stroke="transparent" />
+                                                   ))}
+                                                </Pie>
+                                                <Tooltip {...chartTooltipProps} />
+                                                <Legend
+                                                   wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }}
+                                                   formatter={(value) => (
+                                                      <span className="text-slate-300 font-bold">{value}</span>
+                                                   )}
+                                                />
+                                             </PieChart>
+                                          </ResponsiveContainer>
+                                       </div>
+                                    </div>
+
+                                    <div className="rounded-[2rem] border border-slate-800 bg-slate-950 p-6 min-h-[320px]">
+                                       <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-4">
+                                          Risk score trend (chronological)
+                                       </h3>
+                                       <div className="h-[260px] w-full min-w-0">
+                                          <ResponsiveContainer width="100%" height="100%">
+                                             <LineChart data={analyticsSnapshot.trend} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                                                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+                                                <XAxis dataKey="idx" tick={{ fill: '#64748b', fontSize: 10 }} axisLine={false} tickLine={false} />
+                                                <YAxis domain={[0, 100]} tick={{ fill: '#64748b', fontSize: 10 }} axisLine={false} tickLine={false} width={32} />
+                                                <Tooltip {...chartTooltipProps} />
+                                                <Line type="monotone" dataKey="risk" name="Risk" stroke="#34d399" strokeWidth={2} dot={{ r: 3, fill: '#34d399' }} activeDot={{ r: 5 }} />
+                                             </LineChart>
+                                          </ResponsiveContainer>
+                                       </div>
+                                    </div>
+                                 </div>
+
+                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                    <div className="rounded-[2rem] border border-slate-800 bg-slate-950 p-6 min-h-[300px]">
+                                       <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-4">
+                                          Request latency by evaluation
+                                       </h3>
+                                       <div className="h-[240px] w-full min-w-0">
+                                          <ResponsiveContainer width="100%" height="100%">
+                                             <BarChart data={analyticsSnapshot.trend} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                                                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+                                                <XAxis dataKey="idx" tick={{ fill: '#64748b', fontSize: 10 }} axisLine={false} tickLine={false} />
+                                                <YAxis tick={{ fill: '#64748b', fontSize: 10 }} axisLine={false} tickLine={false} width={36} />
+                                                <Tooltip {...chartTooltipProps} />
+                                                <Bar dataKey="latency" name="Latency (ms)" fill="#6366f1" radius={[6, 6, 0, 0]} />
+                                             </BarChart>
+                                          </ResponsiveContainer>
+                                       </div>
+                                    </div>
+
+                                    <div className="rounded-[2rem] border border-slate-800 bg-slate-950 p-6">
+                                       <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-4">
+                                          Top fraud signals (frequency)
+                                       </h3>
+                                       {analyticsSnapshot.topSignals.length === 0 ? (
+                                          <p className="text-[11px] text-slate-600 py-12 text-center">
+                                             No fraud signals recorded in logs yet.
+                                          </p>
+                                       ) : (
+                                          <ul className="space-y-3 max-h-[240px] overflow-y-auto pr-1 scrollbar-hide">
+                                             {analyticsSnapshot.topSignals.map((row) => (
+                                                <li
+                                                   key={row.raw}
+                                                   className="flex items-center justify-between gap-4 rounded-xl border border-slate-800/80 bg-slate-900/50 px-4 py-3"
+                                                >
+                                                   <span className="text-[11px] font-mono text-slate-300 truncate">
+                                                      {row.raw}
+                                                   </span>
+                                                   <div className="flex items-center gap-2 shrink-0">
+                                                      <div className="h-1.5 w-16 rounded-full bg-slate-800 overflow-hidden">
+                                                         <div
+                                                            className="h-full rounded-full bg-emerald-500/80"
+                                                            style={{
+                                                               width: `${Math.min(100, (row.count / analyticsSnapshot.topSignals[0].count) * 100)}%`,
+                                                            }}
+                                                         />
+                                                      </div>
+                                                      <span className="text-[11px] font-black text-white tabular-nums w-8 text-right">
+                                                         {row.count}
+                                                      </span>
+                                                   </div>
+                                                </li>
+                                             ))}
+                                          </ul>
+                                       )}
+                                    </div>
+                                 </div>
+                              </>
+                           )}
                         </div>
                      </div>
                    )}
