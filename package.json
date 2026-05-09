@@ -9,7 +9,7 @@
   ],
   "scripts": {
     "dev": "npm run dev -w @shieldguard/dashboard",
-    "build": "npm run build -w @shieldguard/dashboard",
+    "build": "npm run build -w @shieldguard/dashboard && node scripts/copy-dist.mjs",
     "preview": "npm run preview -w @shieldguard/dashboard",
     "lint": "npm run lint -w @shieldguard/dashboard",
     "clean": "node scripts/rm-dist.mjs",
