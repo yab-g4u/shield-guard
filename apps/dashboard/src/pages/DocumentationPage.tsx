@@ -1,691 +1,699 @@
-import { useState, useEffect, useRef } from 'react';
-import { motion } from 'motion/react';
-import { 
-  Shield, 
-  Search, 
-  ChevronRight, 
-  Copy, 
-  Terminal, 
-  Layers, 
-  Lock, 
-  Zap, 
-  Code2, 
-  ChevronDown,
-  ArrowRight,
-  CheckCircle2,
-  AlertCircle,
-  Menu,
-  X,
-  Github,
-  Activity,
-  Cpu,
-  Smartphone,
-  MapPin,
-  RefreshCw,
-  Info,
-  Clock,
-  ExternalLink
-} from 'lucide-react';
-import { cn } from '../lib/utils';
+import { useMemo, useState } from 'react';
+import { ArrowLeft, ArrowRight, Copy, Github, Search, Shield } from 'lucide-react';
 import { toast } from 'sonner';
+import { cn } from '../lib/utils';
 
-/**
- * Professional Documentation Page reflecting ShieldGuard's Telecom Trust Infrastructure.
- * Follows the high-fidelity design provided.
- */
-export const DocumentationPage = ({ onBack }: { onBack: () => void }) => {
-  const [activeSection, setActiveSection] = useState('introduction');
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const contentRef = useRef<HTMLDivElement>(null);
+type DocPage = {
+  id: string;
+  title: string;
+  group: string;
+  description: string;
+};
 
-  // Sync scroll with sidebar active state
-  useEffect(() => {
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach(e => {
-        if (e.isIntersecting) {
-          setActiveSection(e.target.id);
-        }
-      });
-    }, { rootMargin: '-20% 0px -70% 0px' });
+const PALETTE = {
+  clouded: '#d1d1d1',
+  greasy: '#828383',
+  suede: '#434343',
+  wax: '#2b2b2b',
+  sooty: '#141414',
+  armor: '#030303',
+};
 
-    const sections = document.querySelectorAll('section[id]');
-    sections.forEach(s => observer.observe(s));
+const DOC_PAGES: DocPage[] = [
+  { id: 'getting-started', title: 'Getting Started', group: 'Core Docs', description: 'Introduction, quick start, decisions, keys, architecture.' },
+  { id: 'sdk-reference', title: 'SDK Reference', group: 'SDK + Concepts', description: 'Initialization, evaluateTransaction, retries, and errors.' },
+  { id: 'fraud-intelligence', title: 'Fraud Intelligence Concepts', group: 'SDK + Concepts', description: 'SIM swap, device mismatch, anomalies, scoring, explainability.' },
+  { id: 'runtime-architecture', title: 'Runtime Architecture', group: 'SDK + Concepts', description: 'Execution model and low-latency fraud orchestration path.' },
+  { id: 'flow-builder-runtime', title: 'Flow Builder Runtime', group: 'Runtime + Ops', description: 'Visual flow logic, lifecycle, testing, and production execution.' },
+  { id: 'webhooks', title: 'Webhooks', group: 'Runtime + Ops', description: 'Events, retry system, signatures, replay, and guarantees.' },
+  { id: 'api-reference', title: 'API Reference', group: 'Runtime + Ops', description: 'POST /v1/evaluate request and response reference.' },
+  { id: 'operational-monitoring', title: 'Operational Monitoring', group: 'Runtime + Ops', description: 'Telemetry, threat response, analytics, and incident workflow.' },
+  { id: 'infrastructure-philosophy', title: 'Infrastructure Philosophy', group: 'Core Docs', description: 'Fraud prevention treated as programmable infrastructure.' },
+];
 
-    return () => sections.forEach(s => observer.unobserve(s));
-  }, []);
+const SectionTitle = ({ children }: { children: string }) => (
+  <h2 className="text-2xl font-black mb-3 mt-8 pb-2 border-b" style={{ borderColor: PALETTE.suede }}>
+    {children}
+  </h2>
+);
 
-  const scrollToSection = (id: string) => {
-    const el = document.getElementById(id);
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth' });
-    }
+const CodeBlock = ({ code, language }: { code: string; language: string }) => {
+  const copy = () => {
+    navigator.clipboard.writeText(code);
+    toast.success('Copied');
   };
-
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    toast.success('Copied to clipboard');
-  };
-
-  const navSections = [
-    {
-      title: 'Getting Started',
-      items: [
-        { id: 'introduction', title: 'Introduction' },
-        { id: 'quickstart', title: 'Quickstart' },
-        { id: 'architecture', title: 'Architecture Overview' },
-        { id: 'authentication', title: 'Authentication' },
-      ]
-    },
-    {
-      title: 'SDK',
-      items: [
-        { id: 'sdk-install', title: 'Installation' },
-        { id: 'sdk-init', title: 'Initialization' },
-        { id: 'sdk-evaluate', title: 'evaluateTransaction()' },
-        { id: 'sdk-policy', title: 'setPolicy()' },
-        { id: 'sdk-webhooks', title: 'Webhooks', badge: 'Beta' },
-      ]
-    },
-    {
-      title: 'CAMARA Signals',
-      items: [
-        { id: 'camara-overview', title: 'Signal Orchestration' },
-        { id: 'sim-swap', title: 'SIM Swap Detection' },
-        { id: 'device-status', title: 'Device Status' },
-        { id: 'location-verify', title: 'Location Verification' },
-        { id: 'kyc-match', title: 'KYC Match' },
-      ]
-    },
-    {
-      title: 'Trust Engine',
-      items: [
-        { id: 'trust-engine', title: 'Evaluation Engine' },
-        { id: 'trust-scoring', title: 'Trust Scoring' },
-        { id: 'decision-thresholds', title: 'Decision Thresholds' },
-        { id: 'explainability', title: 'Explainability' },
-      ]
-    },
-    {
-      title: 'Reference',
-      items: [
-        { id: 'error-codes', title: 'Error Codes' },
-        { id: 'rate-limits', title: 'Rate Limits' },
-        { id: 'changelog', title: 'Changelog' },
-      ]
-    }
-  ];
 
   return (
-    <div className="min-h-screen bg-[#080c14] text-[#e2e8f0] flex font-sans selection:bg-[#38bdf8]/30">
-      {/* ─── SIDEBAR ─────────────────────────────────────── */}
-      <aside className={cn(
-        "fixed inset-y-0 left-0 w-[268px] bg-[#0d1320] border-r border-[#1e3250]/80 z-50 flex flex-col transition-transform duration-300 transform lg:translate-x-0",
-        !isSidebarOpen && "-translate-x-full lg:translate-x-0"
-      )}>
-        <div className="p-5 pb-4 border-b border-[#1e3250]/80">
-          <div className="flex items-center gap-2 mb-4 cursor-pointer" onClick={onBack}>
-            <div className="w-[30px] h-[30px] bg-gradient-to-br from-[#38bdf8] to-[#a78bfa] rounded-lg flex items-center justify-center">
-              <Shield className="w-4 h-4 text-white" />
+    <div className="rounded-xl border overflow-hidden my-4" style={{ borderColor: PALETTE.suede, backgroundColor: PALETTE.sooty }}>
+      <div className="h-9 px-3 border-b flex items-center justify-between" style={{ borderColor: PALETTE.suede, backgroundColor: PALETTE.wax }}>
+        <span className="text-[11px] uppercase tracking-[0.18em]" style={{ color: PALETTE.greasy }}>
+          {language}
+        </span>
+        <button onClick={copy} className="text-xs flex items-center gap-1.5" style={{ color: PALETTE.clouded }}>
+          <Copy className="w-3.5 h-3.5" />
+          Copy
+        </button>
+      </div>
+      <pre className="p-4 text-xs font-mono overflow-x-auto ops-scroll" style={{ color: PALETTE.clouded }}>
+        {code}
+      </pre>
+    </div>
+  );
+};
+
+const BulletList = ({ items }: { items: string[] }) => (
+  <ul className="space-y-2 mb-4">
+    {items.map((item) => (
+      <li key={item} className="text-sm leading-relaxed" style={{ color: PALETTE.clouded }}>
+        - {item}
+      </li>
+    ))}
+  </ul>
+);
+
+const renderPage = (pageId: string) => {
+  if (pageId === 'getting-started') {
+    return (
+      <>
+        <h1 className="text-4xl font-black mb-3">Getting Started</h1>
+        <p className="text-base leading-relaxed mb-3" style={{ color: PALETTE.clouded }}>
+          ShieldGuard is a telecom-powered fraud intelligence infrastructure platform designed for modern digital applications.
+        </p>
+        <p className="text-sm leading-relaxed mb-3" style={{ color: PALETTE.clouded }}>
+          Instead of building custom fraud systems from scratch, developers can integrate ShieldGuard directly into their applications using APIs, SDKs, orchestration flows, and real-time fraud intelligence services.
+        </p>
+        <p className="text-sm mb-2 font-semibold">ShieldGuard helps platforms:</p>
+        <BulletList
+          items={[
+            'detect suspicious transactions',
+            'identify SIM swap attacks',
+            'analyze device risk',
+            'orchestrate fraud response workflows',
+            'monitor transaction threats globally',
+            'automate mitigation actions in real time',
+          ]}
+        />
+        <p className="text-sm mb-2 font-semibold">The platform is built for:</p>
+        <BulletList
+          items={[
+            'fintech applications',
+            'digital wallets',
+            'marketplaces',
+            'telecom services',
+            'lending platforms',
+            'identity verification systems',
+            'enterprise transaction infrastructure',
+          ]}
+        />
+        <p className="text-sm mb-2 leading-relaxed" style={{ color: PALETTE.clouded }}>
+          ShieldGuard operates as infrastructure - not as a standalone consumer application.
+        </p>
+        <p className="text-sm mb-2 font-semibold">The goal is to make fraud prevention:</p>
+        <BulletList items={['invisible to users', 'accessible to developers', 'scalable for businesses']} />
+
+        <SectionTitle>Quick Start</SectionTitle>
+        <h3 className="text-lg font-bold">1. Install the SDK</h3>
+        <CodeBlock language="bash" code="npm install @shieldguard/sdk" />
+        <h3 className="text-lg font-bold">2. Initialize ShieldGuard</h3>
+        <CodeBlock
+          language="ts"
+          code={`import { ShieldGuard } from "@shieldguard/sdk"
+
+const shield = new ShieldGuard({
+  apiKey: process.env.SHIELDGUARD_KEY
+})`}
+        />
+        <h3 className="text-lg font-bold">3. Evaluate a Transaction</h3>
+        <CodeBlock
+          language="ts"
+          code={`const result = await shield.evaluateTransaction({
+  phoneNumber: "+251911223344",
+  amount: 500,
+  deviceId: "device_123"
+})`}
+        />
+        <h3 className="text-lg font-bold">4. Example Response</h3>
+        <CodeBlock
+          language="json"
+          code={`{
+  "riskScore": 82,
+  "decision": "review",
+  "reasons": [
+    "SIM swap detected",
+    "new device login"
+  ],
+  "fraudSignals": [
+    "device_mismatch",
+    "sim_swap_detected"
+  ],
+  "latencyMs": 142
+}`}
+        />
+
+        <SectionTitle>Understanding Risk Decisions</SectionTitle>
+        <p className="text-sm mb-2" style={{ color: PALETTE.clouded }}>
+          ShieldGuard evaluates transaction risk using multiple fraud intelligence signals.
+        </p>
+        <CodeBlock language="text" code={`0-30   -> APPROVE\n31-60  -> REVIEW\n61-100 -> BLOCK`} />
+
+        <SectionTitle>API Keys</SectionTitle>
+        <p className="text-sm mb-2">Developers can generate:</p>
+        <BulletList items={['test keys', 'live production keys', 'restricted environment keys']} />
+        <p className="text-sm mb-2">Keys can be:</p>
+        <BulletList items={['rotated', 'revoked', 'monitored']} />
+        <p className="text-sm mb-2 font-semibold">Never expose production keys publicly.</p>
+
+        <SectionTitle>Playground Overview</SectionTitle>
+        <p className="text-sm mb-2">The Developer Playground allows teams to:</p>
+        <BulletList
+          items={[
+            'test fraud scenarios',
+            'simulate attacks',
+            'inspect requests/responses',
+            'monitor threat telemetry',
+            'debug integrations',
+            'visualize transaction flows globally',
+          ]}
+        />
+        <p className="text-sm mb-2" style={{ color: PALETTE.clouded }}>
+          The playground acts as a live operational environment for integration testing.
+        </p>
+
+        <SectionTitle>Core Features</SectionTitle>
+        <h3 className="text-lg font-bold mb-1">Fraud Intelligence</h3>
+        <BulletList
+          items={[
+            'SIM swap detection',
+            'device mismatch analysis',
+            'transaction anomaly detection',
+            'geo-risk evaluation',
+            'behavioral risk scoring',
+          ]}
+        />
+        <h3 className="text-lg font-bold mb-1">Flow Builder</h3>
+        <BulletList items={['visual fraud orchestration', 'runtime deployment', 'mitigation workflows', 'policy automation']} />
+        <h3 className="text-lg font-bold mb-1">Operational Monitoring</h3>
+        <BulletList items={['live threat telemetry', 'real-time fraud analytics', 'global transaction monitoring', 'webhook event tracking']} />
+        <h3 className="text-lg font-bold mb-1">SDK + APIs</h3>
+        <BulletList items={['TypeScript SDK', 'REST APIs', 'webhook infrastructure', 'retry handling', 'typed responses']} />
+
+        <SectionTitle>Architecture Overview</SectionTitle>
+        <p className="text-sm mb-2">ShieldGuard consists of:</p>
+        <BulletList
+          items={[
+            'SDK layer',
+            'fraud evaluation engine',
+            'orchestration runtime',
+            'telemetry infrastructure',
+            'webhook system',
+            'monitoring layer',
+          ]}
+        />
+        <p className="text-sm mb-2" style={{ color: PALETTE.clouded }}>
+          Applications send transaction data to ShieldGuard. ShieldGuard analyzes fraud signals in real time and returns a risk decision.
+        </p>
+
+        <SectionTitle>Production Readiness</SectionTitle>
+        <p className="text-sm mb-2">ShieldGuard is designed for:</p>
+        <BulletList
+          items={[
+            'low-latency evaluation',
+            'scalable transaction processing',
+            'real-time telemetry',
+            'developer-first integration',
+            'infrastructure-grade reliability',
+          ]}
+        />
+
+        <SectionTitle>Next Steps</SectionTitle>
+        <BulletList
+          items={[
+            'SDK Reference',
+            'Fraud Intelligence Concepts',
+            'Flow Builder Runtime',
+            'Webhook System',
+            'API Reference',
+            'Operational Monitoring',
+          ]}
+        />
+      </>
+    );
+  }
+
+  if (pageId === 'sdk-reference') {
+    return (
+      <>
+        <h1 className="text-4xl font-black mb-3">SDK Reference</h1>
+        <SectionTitle>Overview</SectionTitle>
+        <p className="text-sm mb-2">The ShieldGuard SDK provides a developer-friendly interface for interacting with the ShieldGuard fraud intelligence infrastructure.</p>
+        <p className="text-sm mb-2">The SDK abstracts:</p>
+        <BulletList items={['API communication', 'retries', 'error handling', 'typed responses', 'authentication', 'request validation']} />
+        <SectionTitle>Initialization</SectionTitle>
+        <CodeBlock
+          language="ts"
+          code={`import { ShieldGuard } from "@shieldguard/sdk"
+
+const shield = new ShieldGuard({
+  apiKey: process.env.SHIELDGUARD_KEY
+})`}
+        />
+        <SectionTitle>evaluateTransaction()</SectionTitle>
+        <p className="text-sm mb-2">Evaluates a transaction and returns a fraud risk decision.</p>
+        <CodeBlock
+          language="ts"
+          code={`const result = await shield.evaluateTransaction({
+  phoneNumber: "+251911223344",
+  amount: 500,
+  deviceId: "device_123"
+})`}
+        />
+        <SectionTitle>Request Parameters</SectionTitle>
+        <div className="rounded-xl border overflow-hidden mb-4" style={{ borderColor: PALETTE.suede }}>
+          <table className="w-full text-sm">
+            <thead style={{ backgroundColor: PALETTE.wax }}>
+              <tr>
+                <th className="text-left px-3 py-2 border-r" style={{ borderColor: PALETTE.suede }}>Parameter</th>
+                <th className="text-left px-3 py-2 border-r" style={{ borderColor: PALETTE.suede }}>Type</th>
+                <th className="text-left px-3 py-2">Description</th>
+              </tr>
+            </thead>
+            <tbody style={{ backgroundColor: PALETTE.sooty }}>
+              <tr className="border-t" style={{ borderColor: PALETTE.suede }}>
+                <td className="px-3 py-2 border-r" style={{ borderColor: PALETTE.suede }}>phoneNumber</td>
+                <td className="px-3 py-2 border-r" style={{ borderColor: PALETTE.suede }}>string</td>
+                <td className="px-3 py-2">User phone number</td>
+              </tr>
+              <tr className="border-t" style={{ borderColor: PALETTE.suede }}>
+                <td className="px-3 py-2 border-r" style={{ borderColor: PALETTE.suede }}>amount</td>
+                <td className="px-3 py-2 border-r" style={{ borderColor: PALETTE.suede }}>number</td>
+                <td className="px-3 py-2">Transaction amount</td>
+              </tr>
+              <tr className="border-t" style={{ borderColor: PALETTE.suede }}>
+                <td className="px-3 py-2 border-r" style={{ borderColor: PALETTE.suede }}>deviceId</td>
+                <td className="px-3 py-2 border-r" style={{ borderColor: PALETTE.suede }}>string</td>
+                <td className="px-3 py-2">Device fingerprint identifier</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <SectionTitle>Response Structure</SectionTitle>
+        <CodeBlock
+          language="json"
+          code={`{
+  "riskScore": 82,
+  "decision": "review",
+  "reasons": [],
+  "fraudSignals": [],
+  "latencyMs": 142
+}`}
+        />
+        <SectionTitle>Retry System</SectionTitle>
+        <p className="text-sm mb-2">The SDK automatically retries failed requests.</p>
+        <BulletList items={['exponential backoff', 'timeout handling', 'transient network recovery']} />
+        <SectionTitle>Error Handling</SectionTitle>
+        <CodeBlock language="ts" code={`try {\n  await shield.evaluateTransaction(...)\n} catch (err) {\n  console.error(err)\n}`} />
+        <p className="text-sm mb-2">Error types:</p>
+        <BulletList items={['ShieldNetworkError', 'ShieldValidationError', 'ShieldAuthenticationError']} />
+      </>
+    );
+  }
+
+  if (pageId === 'fraud-intelligence') {
+    return (
+      <>
+        <h1 className="text-4xl font-black mb-3">Fraud Intelligence Concepts</h1>
+        <SectionTitle>SIM Swap Detection</SectionTitle>
+        <p className="text-sm mb-3">SIM swap attacks occur when attackers transfer a victim's phone number to another SIM card.</p>
+        <p className="text-sm mb-3">ShieldGuard analyzes telecom intelligence signals to identify suspicious SIM activity.</p>
+        <SectionTitle>Device Mismatch</SectionTitle>
+        <p className="text-sm mb-2">Device mismatch occurs when:</p>
+        <BulletList
+          items={[
+            'login behavior changes unexpectedly',
+            'a new device appears suddenly',
+            'device fingerprints differ from historical patterns',
+          ]}
+        />
+        <SectionTitle>Transaction Anomalies</SectionTitle>
+        <p className="text-sm mb-2">ShieldGuard evaluates:</p>
+        <BulletList
+          items={[
+            'unusually high transaction values',
+            'abnormal velocity patterns',
+            'suspicious timing behavior',
+            'location inconsistencies',
+          ]}
+        />
+        <SectionTitle>Risk Scoring</SectionTitle>
+        <p className="text-sm mb-2">ShieldGuard aggregates multiple fraud signals into a unified risk score.</p>
+        <CodeBlock language="text" code={`SIM Swap         -> +30\nDevice Mismatch  -> +25\nGeo Risk         -> +15\nHigh Amount      -> +20`} />
+        <p className="text-sm mb-2">Final risk score determines:</p>
+        <BulletList items={['approve', 'review', 'block']} />
+        <SectionTitle>Explainable Intelligence</SectionTitle>
+        <p className="text-sm mb-2">ShieldGuard returns explainable fraud reasoning instead of black-box decisions.</p>
+        <p className="text-sm mb-2">Developers can inspect:</p>
+        <BulletList items={['triggered signals', 'severity', 'mitigation recommendations', 'telemetry metadata']} />
+      </>
+    );
+  }
+
+  if (pageId === 'runtime-architecture') {
+    return (
+      <>
+        <h1 className="text-4xl font-black mb-3">Runtime Architecture</h1>
+        <p className="text-sm mb-2">Fraud evaluation executes in real time through:</p>
+        <BulletList
+          items={[
+            'transaction ingestion',
+            'signal enrichment',
+            'scoring engine',
+            'orchestration runtime',
+            'mitigation pipeline',
+          ]}
+        />
+        <p className="text-sm mb-2">All evaluations are optimized for low-latency execution.</p>
+      </>
+    );
+  }
+
+  if (pageId === 'flow-builder-runtime') {
+    return (
+      <>
+        <h1 className="text-4xl font-black mb-3">Flow Builder Runtime</h1>
+        <SectionTitle>Overview</SectionTitle>
+        <p className="text-sm mb-2">The Flow Builder allows developers to create programmable fraud mitigation workflows visually.</p>
+        <p className="text-sm mb-2">Flows are deployed as executable fraud policies inside the ShieldGuard runtime engine.</p>
+        <SectionTitle>Building Flows</SectionTitle>
+        <p className="text-sm mb-2">Developers create flows using:</p>
+        <BulletList items={['condition nodes', 'signal evaluators', 'mitigation actions', 'webhook triggers']} />
+        <CodeBlock
+          language="text"
+          code={`IF:\nSIM swap detected\nAND amount > $1000\n\nTHEN:\nRequire step-up authentication\nTrigger webhook\nQuarantine transaction`}
+        />
+        <SectionTitle>Deployment Lifecycle</SectionTitle>
+        <p className="text-sm mb-2">Flows move through:</p>
+        <BulletList items={['Draft', 'Testing', 'Active', 'Archived']} />
+        <p className="text-sm mb-2">Deploying a flow:</p>
+        <BulletList
+          items={[
+            'validates logic',
+            'generates runtime policy',
+            'attaches to transaction pipeline',
+            'activates live monitoring',
+          ]}
+        />
+        <SectionTitle>Runtime Execution</SectionTitle>
+        <BulletList
+          items={[
+            'incoming transactions pass through the runtime',
+            'fraud rules execute in real time',
+            'mitigation actions trigger automatically',
+          ]}
+        />
+        <p className="text-sm mb-2">Execution metrics include:</p>
+        <BulletList
+          items={['evaluations/sec', 'blocked fraud attempts', 'latency', 'triggered policies', 'webhook deliveries']}
+        />
+        <SectionTitle>Flow Testing</SectionTitle>
+        <BulletList
+          items={[
+            'replay requests',
+            'simulate fraud',
+            'debug execution paths',
+            'inspect node behavior',
+            'validate mitigation logic',
+          ]}
+        />
+      </>
+    );
+  }
+
+  if (pageId === 'webhooks') {
+    return (
+      <>
+        <h1 className="text-4xl font-black mb-3">Webhooks</h1>
+        <SectionTitle>Overview</SectionTitle>
+        <p className="text-sm mb-2">Webhooks allow ShieldGuard to notify external systems when fraud events occur.</p>
+        <SectionTitle>Example Events</SectionTitle>
+        <CodeBlock
+          language="json"
+          code={`{
+  "event": "transaction.reviewed",
+  "data": {
+    "riskScore": 82,
+    "decision": "review"
+  }
+}`}
+        />
+        <SectionTitle>Supported Events</SectionTitle>
+        <div className="rounded-xl border overflow-hidden mb-4" style={{ borderColor: PALETTE.suede }}>
+          <table className="w-full text-sm">
+            <thead style={{ backgroundColor: PALETTE.wax }}>
+              <tr>
+                <th className="text-left px-3 py-2 border-r" style={{ borderColor: PALETTE.suede }}>Event</th>
+                <th className="text-left px-3 py-2">Description</th>
+              </tr>
+            </thead>
+            <tbody style={{ backgroundColor: PALETTE.sooty }}>
+              {[
+                ['transaction.approved', 'Safe transaction'],
+                ['transaction.reviewed', 'Suspicious transaction'],
+                ['transaction.blocked', 'Fraud blocked'],
+                ['flow.triggered', 'Runtime flow executed'],
+              ].map(([event, description]) => (
+                <tr key={event} className="border-t" style={{ borderColor: PALETTE.suede }}>
+                  <td className="px-3 py-2 border-r font-mono" style={{ borderColor: PALETTE.suede }}>{event}</td>
+                  <td className="px-3 py-2">{description}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <SectionTitle>Delivery System</SectionTitle>
+        <p className="text-sm mb-2">ShieldGuard webhooks support:</p>
+        <BulletList items={['retries', 'signature validation', 'delivery monitoring', 'event replay', 'failure recovery']} />
+      </>
+    );
+  }
+
+  if (pageId === 'api-reference') {
+    return (
+      <>
+        <h1 className="text-4xl font-black mb-3">API Reference</h1>
+        <SectionTitle>POST /v1/evaluate</SectionTitle>
+        <p className="text-sm mb-2">Evaluates transaction fraud risk.</p>
+        <h3 className="text-lg font-bold mt-4">Request</h3>
+        <CodeBlock
+          language="json"
+          code={`{
+  "phoneNumber": "+251911223344",
+  "amount": 500,
+  "deviceId": "device_123"
+}`}
+        />
+        <h3 className="text-lg font-bold mt-4">Response</h3>
+        <CodeBlock language="json" code={`{\n  "riskScore": 82,\n  "decision": "review"\n}`} />
+        <SectionTitle>Authentication</SectionTitle>
+        <CodeBlock language="http" code={`Authorization: Bearer YOUR_API_KEY`} />
+      </>
+    );
+  }
+
+  if (pageId === 'operational-monitoring') {
+    return (
+      <>
+        <h1 className="text-4xl font-black mb-3">Operational Monitoring</h1>
+        <SectionTitle>Overview</SectionTitle>
+        <p className="text-sm mb-2">Operational Monitoring provides real-time fraud telemetry and infrastructure visibility.</p>
+        <p className="text-sm mb-2">The monitoring system allows developers to:</p>
+        <BulletList
+          items={[
+            'inspect live traffic',
+            'monitor fraud trends',
+            'analyze attack behavior',
+            'track mitigation actions',
+          ]}
+        />
+        <SectionTitle>Global Threat Intelligence</SectionTitle>
+        <BulletList
+          items={[
+            'real-time 3D transaction globe',
+            'fraud hotspot detection',
+            'cross-border attack visualization',
+            'transaction throughput monitoring',
+          ]}
+        />
+        <SectionTitle>Threat Response Center</SectionTitle>
+        <p className="text-sm mb-2">When suspicious activity is detected:</p>
+        <BulletList
+          items={[
+            'incidents are logged',
+            'transactions quarantined',
+            'mitigation flows triggered',
+            'alerts dispatched',
+          ]}
+        />
+        <p className="text-sm mb-2">Developers can:</p>
+        <BulletList
+          items={[
+            'replay incidents',
+            'inspect affected traffic',
+            'review fraud reasoning',
+            'analyze attack patterns',
+          ]}
+        />
+        <SectionTitle>Analytics & Telemetry</SectionTitle>
+        <BulletList
+          items={[
+            'fraud detection rate',
+            'API latency',
+            'active mitigation flows',
+            'webhook activity',
+            'threat severity distribution',
+            'request throughput',
+            'attack clusters',
+          ]}
+        />
+        <SectionTitle>Incident Workflow</SectionTitle>
+        <BulletList items={['Detection', 'Risk evaluation', 'Mitigation execution', 'Incident logging', 'Alert delivery', 'Developer response']} />
+      </>
+    );
+  }
+
+  return (
+    <>
+      <h1 className="text-4xl font-black mb-3">Infrastructure Philosophy</h1>
+      <p className="text-sm mb-3">ShieldGuard treats fraud prevention as infrastructure.</p>
+      <p className="text-sm mb-2">The platform is designed to:</p>
+      <BulletList
+        items={[
+          'integrate invisibly',
+          'scale operationally',
+          'automate mitigation',
+          'provide explainable intelligence',
+          'enable developer-first fraud operations',
+        ]}
+      />
+    </>
+  );
+};
+
+export const DocumentationPage = ({ onBack }: { onBack: () => void }) => {
+  const [activePage, setActivePage] = useState('getting-started');
+  const [query, setQuery] = useState('');
+
+  const filteredPages = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return DOC_PAGES;
+    return DOC_PAGES.filter((page) => `${page.title} ${page.description} ${page.group}`.toLowerCase().includes(q));
+  }, [query]);
+
+  const grouped = useMemo(() => {
+    return filteredPages.reduce<Record<string, DocPage[]>>((acc, page) => {
+      acc[page.group] ||= [];
+      acc[page.group].push(page);
+      return acc;
+    }, {});
+  }, [filteredPages]);
+
+  const groupedEntries = useMemo(() => Object.entries(grouped) as [string, DocPage[]][], [grouped]);
+  const pageMeta = DOC_PAGES.find((page) => page.id === activePage);
+  const activeIndex = DOC_PAGES.findIndex((page) => page.id === activePage);
+  const nextPage = activeIndex >= 0 && activeIndex < DOC_PAGES.length - 1 ? DOC_PAGES[activeIndex + 1] : null;
+
+  return (
+    <div className="min-h-screen flex text-white" style={{ backgroundColor: PALETTE.armor }}>
+      <aside className="w-[300px] h-screen sticky top-0 border-r flex flex-col" style={{ borderColor: PALETTE.suede, backgroundColor: PALETTE.sooty }}>
+        <div className="p-4 border-b" style={{ borderColor: PALETTE.suede }}>
+          <button onClick={onBack} className="text-sm inline-flex items-center gap-2 mb-4" style={{ color: PALETTE.greasy }}>
+            <ArrowLeft className="w-4 h-4" />
+            Back
+          </button>
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-9 h-9 rounded-lg border flex items-center justify-center" style={{ borderColor: PALETTE.suede, backgroundColor: PALETTE.wax }}>
+              <Shield className="w-4 h-4" style={{ color: PALETTE.clouded }} />
             </div>
             <div>
-              <div className="text-[15px] font-bold tracking-tight">ShieldGuard</div>
-              <div className="font-mono text-[9px] text-[#38bdf8] bg-[#38bdf8]/10 border border-[#38bdf8]/20 px-1 rounded inline-block tracking-widest mt-0.5">DOCS v1.0</div>
+              <p className="font-black leading-none text-lg">ShieldGuard Docs</p>
+              <p className="text-[10px] uppercase tracking-[0.2em]" style={{ color: PALETTE.greasy }}>Enterprise Console</p>
             </div>
           </div>
-
-          <div className="relative group">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-[13px] h-[13px] text-[#475569] group-focus-within:text-[#38bdf8] transition-colors" />
-            <input 
-              type="text" 
-              placeholder="Search docs..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-[#111827] border border-[#1e3250] rounded-lg py-2 pl-9 pr-10 text-[12.5px] outline-none focus:border-[#38bdf8]/50 transition-all font-sans"
+          <div className="relative">
+            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2" style={{ color: PALETTE.greasy }} />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search documentation..."
+              className="w-full h-9 rounded-lg border pl-9 pr-3 text-sm outline-none"
+              style={{ backgroundColor: PALETTE.armor, borderColor: PALETTE.suede, color: PALETTE.clouded }}
             />
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 font-mono text-[9px] text-[#475569] bg-[#1a2234] border border-[#1e3250] px-1 rounded">⌘K</span>
           </div>
         </div>
 
-        <nav className="flex-1 overflow-y-auto p-3 space-y-4">
-          {navSections.map((section) => (
-            <div key={section.title} className="space-y-1">
-              <h3 className="text-[10.5px] font-bold text-[#475569] uppercase tracking-[0.07em] px-2.5 py-2">{section.title}</h3>
-              <div className="space-y-0.5">
-                {section.items.map((item) => (
+        <nav className="flex-1 overflow-y-auto ops-scroll p-3 space-y-4">
+          {groupedEntries.map(([group, pages]) => (
+            <div key={group}>
+              <p className="text-[10px] uppercase tracking-[0.2em] px-2 mb-2" style={{ color: PALETTE.greasy }}>
+                {group}
+              </p>
+              <div className="space-y-1">
+                {pages.map((page) => (
                   <button
-                    key={item.id}
-                    onClick={() => scrollToSection(item.id)}
+                    key={page.id}
+                    onClick={() => setActivePage(page.id)}
                     className={cn(
-                      "w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[13px] transition-all group relative",
-                      activeSection === item.id 
-                        ? "text-[#38bdf8] bg-[#38bdf8]/10 font-medium" 
-                        : "text-[#94a3b8] hover:text-[#e2e8f0] hover:bg-[#1a2234]"
+                      'w-full text-left rounded-lg border px-3 py-2 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_8px_20px_rgba(0,0,0,0.3)]',
+                      activePage === page.id ? 'font-semibold' : ''
                     )}
+                    style={{
+                      borderColor: activePage === page.id ? PALETTE.clouded : 'transparent',
+                      backgroundColor: activePage === page.id ? PALETTE.wax : 'transparent',
+                      color: activePage === page.id ? PALETTE.clouded : PALETTE.greasy,
+                    }}
                   >
-                    {activeSection === item.id && (
-                      <div className="absolute left-0 top-[20%] bottom-[20%] w-[2px] bg-[#38bdf8] rounded-r-sm" />
-                    )}
-                    <div className={cn(
-                      "w-[5px] h-[5px] rounded-full flex-shrink-0 transition-colors",
-                      activeSection === item.id ? "bg-[#38bdf8]" : "bg-[#475569] group-hover:bg-[#38bdf8]"
-                    )} />
-                    {item.title}
-                    {item.badge && (
-                      <span className="ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded bg-[#fbbf24]/10 text-[#fbbf24] border border-[#fbbf24]/20 uppercase tracking-widest leading-none">
-                        {item.badge}
-                      </span>
-                    )}
+                    <p className="text-sm">{page.title}</p>
                   </button>
                 ))}
               </div>
             </div>
           ))}
         </nav>
-
-        <div className="p-3 border-t border-[#1e3250]/80">
-          <div className="flex items-center gap-2 text-[11px] text-[#475569] px-3">
-             <div className="w-[5px] h-[5px] rounded-full bg-[#34d399]" />
-             <span className="font-mono">@shieldguard/sdk@1.0.0</span>
-          </div>
-        </div>
       </aside>
 
-      {/* ─── MAIN ─────────────────────────────────────── */}
-      <div className="flex-1 lg:ml-[268px] flex flex-col min-h-screen">
-        {/* Topbar */}
-        <header className="sticky top-0 h-[52px] bg-[#080c14]/85 backdrop-blur-xl border-b border-[#1e3250]/80 z-40 flex items-center px-6 lg:px-8">
-           <div className="flex items-center gap-1.5 text-[12.5px] text-[#475569]">
-              <button 
-                onClick={onBack}
-                className="hover:text-[#38bdf8] transition-colors"
+      <main className="flex-1 h-screen overflow-y-auto ops-scroll px-8 py-8">
+        <div className="max-w-5xl">
+          <div className="mb-8 rounded-xl border p-4 flex items-start justify-between gap-4" style={{ borderColor: PALETTE.suede, backgroundColor: PALETTE.sooty }}>
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.2em] mb-1" style={{ color: PALETTE.greasy }}>
+                {pageMeta?.group}
+              </p>
+              <h3 className="text-lg font-bold mb-1">{pageMeta?.title}</h3>
+              <p className="text-sm" style={{ color: PALETTE.clouded }}>{pageMeta?.description}</p>
+            </div>
+            <button
+              onClick={() => window.open('https://github.com/yab-g4u/shield-guard.git', '_blank', 'noopener,noreferrer')}
+              className="inline-flex items-center gap-2 rounded-lg border px-3 h-9 text-xs font-semibold transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_8px_24px_rgba(0,0,0,0.35)]"
+              style={{ borderColor: PALETTE.suede, backgroundColor: PALETTE.wax, color: PALETTE.clouded }}
+            >
+              <Github className="w-3.5 h-3.5" />
+              GitHub
+            </button>
+          </div>
+          {renderPage(activePage)}
+          {nextPage && (
+            <div className="mt-10 pt-6 border-t" style={{ borderColor: PALETTE.suede }}>
+              <button
+                onClick={() => setActivePage(nextPage.id)}
+                className="inline-flex items-center gap-2 rounded-xl border px-5 h-11 text-sm font-semibold transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_10px_25px_rgba(0,0,0,0.35)]"
+                style={{ borderColor: PALETTE.clouded, backgroundColor: PALETTE.clouded, color: PALETTE.armor }}
               >
-                Docs
+                Next: {nextPage.title}
+                <ArrowRight className="w-4 h-4" />
               </button>
-              <span>/</span>
-              <span className="text-[#94a3b8]">Documentation</span>
-           </div>
-           
-           <div className="ml-auto flex items-center gap-3">
-              <a 
-                href="https://github.com/ShieldGuard/sdk" 
-                target="_blank" 
-                rel="noreferrer"
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#111827] border border-[#1e3250] text-[12px] font-medium text-[#94a3b8] hover:border-[#38bdf8]/20 hover:text-[#e2e8f0] transition-all"
-              >
-                <Github className="w-3.5 h-3.5" />
-                GitHub
-              </a>
-              <div className="font-mono text-[10.5px] text-[#38bdf8] bg-[#38bdf8]/10 border border-[#38bdf8]/20 px-2 py-0.5 rounded-full">v1.0.0</div>
-           </div>
-        </header>
-
-        <div className="flex flex-1">
-          {/* Doc Content */}
-          <main className="flex-1 px-6 lg:px-10 py-12 max-w-[860px] min-w-0" ref={contentRef}>
-            
-            {/* Introduction */}
-            <section id="introduction" className="mb-16">
-              <div className="flex items-center gap-2 text-[#38bdf8] font-mono text-[11px] uppercase tracking-[.1em] mb-2">
-                <div className="w-[20px] h-[1px] bg-[#38bdf8]" />
-                Documentation
-              </div>
-              <h1 className="text-4xl font-display font-extrabold tracking-tight text-[#e2e8f0] mb-4 leading-tight">
-                ShieldGuard<br />
-                <span className="text-[#38bdf8]">Trust Infrastructure</span>
-              </h1>
-              <p className="text-[16.5px] text-[#94a3b8] leading-relaxed mb-8 max-w-[620px]">
-                Programmable telecom-native fraud prevention for African fintechs. Orchestrate CAMARA Open Gateway APIs into real-time trust decisions via a unified SDK.
-              </p>
-
-              <div className="bg-gradient-to-br from-[#38bdf8]/5 to-[#a78bfa]/5 border border-[#38bdf8]/15 rounded-xl p-7 mb-10 relative overflow-hidden">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-4 relative z-10">
-                   <div>
-                      <div className="font-mono text-[10px] text-[#475569] uppercase tracking-widest mb-1">Avg Latency</div>
-                      <div className="text-[22px] font-extrabold text-[#38bdf8]">420ms</div>
-                   </div>
-                   <div>
-                      <div className="font-mono text-[10px] text-[#475569] uppercase tracking-widest mb-1">CAMARA Signals</div>
-                      <div className="text-[22px] font-extrabold text-[#a78bfa]">5 APIs</div>
-                   </div>
-                   <div>
-                      <div className="font-mono text-[10px] text-[#475569] uppercase tracking-widest mb-1">Decision Types</div>
-                      <div className="text-[22px] font-extrabold text-[#34d399]">3 Modes</div>
-                   </div>
-                   <div>
-                      <div className="font-mono text-[10px] text-[#475569] uppercase tracking-widest mb-1">Uptime SLA</div>
-                      <div className="text-[22px] font-extrabold text-[#fbbf24]">99.9%</div>
-                   </div>
-                </div>
-                <p className="text-[13.5px] text-[#94a3b8] leading-relaxed max-w-[580px] relative z-10">
-                  ShieldGuard sits between your transaction layer and your execution logic. When a user initiates a transaction, ShieldGuard orchestrates multiple Nokia Network as Code CAMARA APIs <strong className="text-[#e2e8f0]">in parallel</strong>, fuses the resulting signals into a weighted trust score, and returns an explainable decision.
-                </p>
-                <div className="absolute right-[-10px] bottom-[-20px] text-[88px] font-black text-[#38bdf8]/5 pointer-events-none select-none">
-                  CAMARA
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-12">
-                 <button onClick={() => scrollToSection('quickstart')} className="group flex flex-col p-4.5 bg-[#111827] border border-[#1e3250] rounded-xl text-left hover:border-[#38bdf8]/30 transition-all">
-                    <span className="text-xl mb-2 group-hover:scale-110 transition-transform block">⚡</span>
-                    <span className="text-[14px] font-bold text-[#e2e8f0] mb-1">Quickstart</span>
-                    <span className="text-[12.5px] text-[#475569] leading-tight">Up and running in 5 minutes with the SDK</span>
-                 </button>
-                 <button onClick={() => scrollToSection('sdk-evaluate')} className="group flex flex-col p-4.5 bg-[#111827] border border-[#1e3250] rounded-xl text-left hover:border-[#38bdf8]/30 transition-all">
-                    <span className="text-xl mb-2 group-hover:scale-110 transition-transform block">🔌</span>
-                    <span className="text-[14px] font-bold text-[#e2e8f0] mb-1">SDK Reference</span>
-                    <span className="text-[12.5px] text-[#475569] leading-tight">Complete type definitions for the SDK</span>
-                 </button>
-                 <button onClick={() => scrollToSection('camara-overview')} className="group flex flex-col p-4.5 bg-[#111827] border border-[#1e3250] rounded-xl text-left hover:border-[#38bdf8]/30 transition-all">
-                    <span className="text-xl mb-2 group-hover:scale-110 transition-transform block">📡</span>
-                    <span className="text-[14px] font-bold text-[#e2e8f0] mb-1">CAMARA Signals</span>
-                    <span className="text-[12.5px] text-[#475569] leading-tight">Understand what each telecom API returns</span>
-                 </button>
-              </div>
-            </section>
-
-            {/* Quickstart */}
-            <section id="quickstart" className="mb-20">
-              <h2 className="text-[22px] font-display font-bold text-[#e2e8f0] flex items-center gap-2 mb-4 pb-2 border-b border-[#1e3250]">
-                Quickstart
-                <button className="text-[#475569] font-normal hover:text-[#38bdf8]">#</button>
-              </h2>
-              <p className="text-[14.5px] text-[#94a3b8] leading-relaxed mb-6">Learn how to install ShieldGuard and start evaluating transactions immediately.</p>
-
-              <div className="space-y-8">
-                <div>
-                  <h3 className="text-[16px] font-bold text-[#e2e8f0] mb-3">1. Install the SDK</h3>
-                  <div className="bg-[#0d1320] border border-[#1e3250] rounded-lg overflow-hidden my-4">
-                    <div className="flex items-center justify-between px-4 py-2 bg-[#111827] border-b border-[#1e3250]">
-                       <span className="font-mono text-[11px] uppercase tracking-wider text-[#475569]">bash</span>
-                       <button onClick={() => copyToClipboard('npm install @shieldguard/sdk')} className="text-[#475569] hover:text-[#38bdf8] transition-colors"><Copy className="w-3.5 h-3.5" /></button>
-                    </div>
-                    <div className="p-4.5 font-mono text-[13px] leading-relaxed">
-                      <div className="text-[#475569] italic"># install via npm</div>
-                      <div><span className="text-[#38bdf8] font-bold">npm</span> install @shieldguard/sdk</div>
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <h3 className="text-[16px] font-bold text-[#e2e8f0] mb-3">2. Initialize and Evaluate</h3>
-                  <div className="bg-[#0d1320] border border-[#1e3250] rounded-lg overflow-hidden my-4">
-                    <div className="flex items-center justify-between px-4 py-2 bg-[#111827] border-b border-[#1e3250]">
-                       <span className="font-mono text-[11px] uppercase tracking-wider text-[#475569]">typescript</span>
-                       <button onClick={() => copyToClipboard('const shield = new ShieldGuard({ apiKey: process.env.SHIELDGUARD_KEY });')} className="text-[#475569] hover:text-[#38bdf8] transition-colors"><Copy className="w-3.5 h-3.5" /></button>
-                    </div>
-                    <div className="p-4.5 font-mono text-[13px] leading-relaxed overflow-x-auto whitespace-pre">
-                      <span className="text-[#c084fc]">import</span> <span className="text-[#e2e8f0]">{`{ ShieldGuard }`}</span> <span className="text-[#c084fc]">from</span> <span className="text-[#86efac]">"@shieldguard/sdk"</span>;{'\n\n'}
-                      <span className="text-[#c084fc]">const</span> <span className="text-[#e2e8f0]">shield</span> <span className="text-[#94a3b8]">=</span> <span className="text-[#c084fc]">new</span> <span className="text-[#38bdf8]">ShieldGuard</span>({`{`}{'\n'}
-                      {'  '}<span className="text-[#fbbf24]">apiKey</span><span className="text-[#94a3b8]">:</span> <span className="text-[#e2e8f0]">process</span><span className="text-[#94a3b8]">.</span><span className="text-[#e2e8f0]">env</span><span className="text-[#94a3b8]">.</span><span className="text-[#e2e8f0]">SHIELDGUARD_KEY</span>{'\n'}
-                      {`})`};{'\n\n'}
-                      <span className="text-[#c084fc]">const</span> <span className="text-[#e2e8f0]">result</span> <span className="text-[#94a3b8]">=</span> <span className="text-[#c084fc]">await</span> <span className="text-[#e2e8f0]">shield</span><span className="text-[#94a3b8]">.</span><span className="text-[#38bdf8]">evaluateTransaction</span>({`{`}{'\n'}
-                      {'  '}<span className="text-[#fbbf24]">phoneNumber</span><span className="text-[#94a3b8]">:</span> <span className="text-[#86efac]">"+251911223344"</span>,{'\n'}
-                      {'  '}<span className="text-[#fbbf24]">amount</span><span className="text-[#94a3b8]">:</span> <span className="text-[#fb923c]">500</span>,{'\n'}
-                      {'  '}<span className="text-[#fbbf24]">deviceId</span><span className="text-[#94a3b8]">:</span> <span className="text-[#86efac]">"device_123"</span>{'\n'}
-                      {`})`};
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-8 bg-[#38bdf8]/10 border border-[#38bdf8]/20 rounded-lg p-4 flex gap-3 text-[13.5px]">
-                 <Info className="w-4 h-4 text-[#38bdf8] flex-shrink-0 mt-0.5" />
-                 <div>
-                    <strong className="text-[#38bdf8] block mb-1">Environment Variables</strong>
-                    <span className="text-[#94a3b8]">Add <code>SHIELDGUARD_KEY</code> to your environment. Never expose your secret key in frontend code.</span>
-                 </div>
-              </div>
-            </section>
-
-            {/* Architecture Overview */}
-            <section id="architecture" className="mb-20">
-              <h2 className="text-[22px] font-display font-bold text-[#e2e8f0] flex items-center gap-2 mb-4 pb-2 border-b border-[#1e3250]">
-                Architecture Overview
-                <button className="text-[#475569] font-normal hover:text-[#38bdf8]">#</button>
-              </h2>
-              <p className="text-[14.5px] text-[#94a3b8] leading-relaxed mb-6">
-                ShieldGuard is a layered trust infrastructure platform. Every evaluation passes through 5 distinct orchestration stages.
-              </p>
-
-              <div className="bg-[#0d1320] border border-[#1e3250] rounded-xl p-8 text-center my-6">
-                <div className="flex flex-col items-center gap-0">
-                  <div className="bg-[#111827] border border-[#38bdf8]/30 text-[#38bdf8] px-6 py-3 rounded-lg font-bold text-sm min-w-[240px]">
-                    Client Request
-                    <div className="font-mono text-[10px] text-[#475569] font-normal mt-1">SDK Call / HTTP Post</div>
-                  </div>
-                  <div className="w-[1px] h-[30px] bg-[#1e3250] relative flex items-center justify-center">
-                    <div className="absolute bottom-[-1px] border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-t-[7px] border-t-[#1e3250]" />
-                  </div>
-                  <div className="bg-[#111827] border border-[#1e3250] text-[#e2e8f0] px-6 py-3 rounded-lg font-bold text-sm min-w-[240px]">
-                    API Gateway
-                    <div className="font-mono text-[10px] text-[#475569] font-normal mt-1">POST /v1/evaluate</div>
-                  </div>
-                  <div className="w-[1px] h-[30px] bg-[#1e3250] relative flex items-center justify-center">
-                    <div className="absolute bottom-[-1px] border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-t-[7px] border-t-[#1e3250]" />
-                  </div>
-                  <div className="bg-[#111827] border border-[#a78bfa]/30 text-[#a78bfa] px-6 py-3 rounded-lg font-bold text-sm min-w-[240px]">
-                    CAMARA Signal Orchestrator
-                    <div className="font-mono text-[10px] text-[#475569] font-normal mt-1">SIM Swap · Device · Location · KYC</div>
-                  </div>
-                  <div className="w-[1px] h-[30px] bg-[#1e3250] relative flex items-center justify-center">
-                    <div className="absolute bottom-[-1px] border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-t-[7px] border-t-[#1e3250]" />
-                  </div>
-                  <div className="bg-[#111827] border border-[#34d399]/30 text-[#34d399] px-6 py-3 rounded-lg font-bold text-sm min-w-[240px]">
-                    Trust Evaluation Engine
-                    <div className="font-mono text-[10px] text-[#475569] font-normal mt-1">ALLOW · VERIFY · BLOCK</div>
-                  </div>
-                  <div className="w-[1px] h-[30px] bg-[#1e3250] relative flex items-center justify-center">
-                    <div className="absolute bottom-[-1px] border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-t-[7px] border-t-[#1e3250]" />
-                  </div>
-                  <div className="bg-[#111827] border border-[#1e3250] text-[#e2e8f0] px-6 py-3 rounded-lg font-bold text-sm min-w-[240px]">
-                    Decision Response & Explainer
-                    <div className="font-mono text-[10px] text-[#475569] font-normal mt-1">Human-readable Reasons</div>
-                  </div>
-                </div>
-              </div>
-            </section>
-
-             {/* Authentication */}
-             <section id="authentication" className="mb-20">
-              <h2 className="text-[22px] font-display font-bold text-[#e2e8f0] flex items-center gap-2 mb-4 pb-2 border-b border-[#1e3250]">
-                Authentication
-                <button className="text-[#475569] font-normal hover:text-[#38bdf8]">#</button>
-              </h2>
-              <p className="text-[14.5px] text-[#94a3b8] leading-relaxed mb-6">
-                All API requests must be authenticated using a Bearer token in the Authorization header.
-              </p>
-              <div className="bg-[#0d1320] border border-[#1e3250] rounded-lg overflow-hidden my-4 p-5 font-mono text-[13px] leading-relaxed">
-                 <div className="flex gap-4"><span className="text-[#475569]">Authorization:</span> <span className="text-[#38bdf8]">Bearer sg_live_...</span></div>
-              </div>
-            </section>
-
-            {/* SDK Installation */}
-            <section id="sdk-install" className="mb-20">
-               <h2 className="text-[22px] font-bold text-[#e2e8f0] flex items-center gap-2 mb-4 pb-2 border-b border-[#1e3250]">
-                SDK Installation
-                <button className="text-[#475569] font-normal hover:text-[#38bdf8]">#</button>
-              </h2>
-              <p className="text-[14.5px] text-[#94a3b8] leading-relaxed mb-6">
-                The ShieldGuard SDK is available as a scoped npm package. It requires Node.js 18.x or later.
-              </p>
-
-              <div className="bg-[#0d1320] border border-[#1e3250] rounded-lg overflow-hidden my-4 font-mono text-[13px] p-5 leading-relaxed">
-                 <div className="text-[#475569]"># via npm</div>
-                 <div>npm install @shieldguard/sdk</div>
-                 <div className="mt-2 text-[#475569]"># via yarn</div>
-                 <div>yarn add @shieldguard/sdk</div>
-              </div>
-            </section>
-
-             {/* SDK Initialization */}
-             <section id="sdk-init" className="mb-20">
-               <h2 className="text-[22px] font-bold text-[#e2e8f0] flex items-center gap-2 mb-4 pb-2 border-b border-[#1e3250]">
-                Initialization
-                <button className="text-[#475569] font-normal hover:text-[#38bdf8]">#</button>
-              </h2>
-              <p className="text-[14.5px] text-[#94a3b8] leading-relaxed mb-6">
-                Initialize the SDK with your API key and optional configuration.
-              </p>
-
-              <div className="bg-[#0d1320] border border-[#1e3250] rounded-lg overflow-hidden my-4 font-mono text-[13px] p-5 leading-relaxed whitespace-pre overflow-x-auto">
-<span className="text-[#c084fc]">const</span> <span className="text-[#e2e8f0]">shield</span> <span className="text-[#94a3b8]">=</span> <span className="text-[#c084fc]">new</span> <span className="text-[#38bdf8]">ShieldGuard</span>({`{`}{'\n'}
-{'  '}<span className="text-[#fbbf24]">apiKey</span><span className="text-[#94a3b8]">:</span> <span className="text-[#86efac]">"sg_live_..."</span>,{'\n'}
-{'  '}<span className="text-[#fbbf24]">baseUrl</span><span className="text-[#94a3b8]">:</span> <span className="text-[#86efac]">"https://api.shieldguard.com"</span>,{'\n'}
-{'  '}<span className="text-[#fbbf24]">timeout</span><span className="text-[#94a3b8]">:</span> <span className="text-[#fb923c]">5000</span>,{'\n'}
-{'  '}<span className="text-[#fbbf24]">maxRetries</span><span className="text-[#94a3b8]">:</span> <span className="text-[#fb923c]">3</span>{'\n'}
-{`}`});
-              </div>
-            </section>
-
-            {/* SDK evaluateTransaction */}
-            <section id="sdk-evaluate" className="mb-20">
-               <h2 className="text-[22px] font-bold text-[#e2e8f0] flex items-center gap-2 mb-4 pb-2 border-b border-[#1e3250]">
-                evaluateTransaction()
-                <button className="text-[#475569] font-normal hover:text-[#38bdf8]">#</button>
-              </h2>
-              <p className="text-[14.5px] text-[#94a3b8] leading-relaxed mb-6">
-                The core logic engine. It probes telecom network signals and returns a comprehensive trust decision.
-              </p>
-
-              <div className="bg-[#0d1320] border border-[#1e3250] rounded-lg overflow-hidden my-4 font-mono text-[13px] p-5 leading-relaxed whitespace-pre overflow-x-auto">
-<span className="text-[#c084fc]">const</span> <span className="text-[#e2e8f0]">result</span> <span className="text-[#94a3b8]">=</span> <span className="text-[#c084fc]">await</span> <span className="text-[#e2e8f0]">shield</span><span className="text-[#94a3b8]">.</span><span className="text-[#38bdf8]">evaluateTransaction</span>({`{`}{'\n'}
-{'  '}<span className="text-[#fbbf24]">phoneNumber</span><span className="text-[#94a3b8]">:</span> <span className="text-[#86efac]">"+251911223344"</span>,{'\n'}
-{'  '}<span className="text-[#fbbf24]">amount</span><span className="text-[#94a3b8]">:</span> <span className="text-[#fb923c]">12500</span>,{'\n'}
-{'  '}<span className="text-[#fbbf24]">deviceId</span><span className="text-[#94a3b8]">:</span> <span className="text-[#86efac]">"hw_998x2"</span>{'\n'}
-{`}`});
-              </div>
-            </section>
-
-            {/* SDK setPolicy */}
-            <section id="sdk-policy" className="mb-20">
-               <h2 className="text-[22px] font-bold text-[#e2e8f0] flex items-center gap-2 mb-4 pb-2 border-b border-[#1e3250]">
-                setPolicy()
-                <button className="text-[#475569] font-normal hover:text-[#38bdf8]">#</button>
-              </h2>
-              <p className="text-[14.5px] text-[#94a3b8] leading-relaxed mb-6">
-                Dynamically update risk thresholds and policy flags for the current session.
-              </p>
-
-              <div className="bg-[#0d1320] border border-[#1e3250] rounded-lg overflow-hidden my-4 font-mono text-[13px] p-5 leading-relaxed whitespace-pre overflow-x-auto">
-<span className="text-[#e2e8f0]">shield</span><span className="text-[#94a3b8]">.</span><span className="text-[#38bdf8]">setPolicy</span>({`{`}{'\n'}
-{'  '}<span className="text-[#fbbf24]">blockIfRiskAbove</span><span className="text-[#94a3b8]">:</span> <span className="text-[#fb923c]">80</span>,{'\n'}
-{'  '}<span className="text-[#fbbf24]">requireSimSwapClearance</span><span className="text-[#94a3b8]">:</span> <span className="bool text-[#f472b6]">true</span>{'\n'}
-{`}`});
-              </div>
-            </section>
-
-             {/* SDK Webhooks */}
-             <section id="sdk-webhooks" className="mb-20">
-               <h2 className="text-[22px] font-bold text-[#e2e8f0] flex items-center gap-2 mb-4 pb-2 border-b border-[#1e3250]">
-                Webhooks
-                <button className="text-[#475569] font-normal hover:text-[#38bdf8]">#</button>
-              </h2>
-              <p className="text-[14.5px] text-[#94a3b8] leading-relaxed mb-6">
-                Handle asynchronous evaluation updates and verify webhook signatures.
-              </p>
-
-              <div className="bg-[#0d1320] border border-[#1e3250] rounded-lg overflow-hidden my-4 font-mono text-[13px] p-5 leading-relaxed whitespace-pre overflow-x-auto">
-<span className="text-[#c084fc]">const</span> <span className="text-[#e2e8f0]">isValid</span> <span className="text-[#94a3b8]">=</span> <span className="text-[#e2e8f0]">shield</span><span className="text-[#94a3b8]">.</span><span className="text-[#38bdf8]">verifyWebhook</span><span className="text-[#e2e8f0]">(payload, signature)</span>;
-              </div>
-            </section>
-
-            {/* CAMARA Signals */}
-            <section id="camara-overview" className="mb-20">
-               <h2 className="text-[22px] font-bold text-[#e2e8f0] flex items-center gap-2 mb-4 pb-2 border-b border-[#1e3250]">
-                Signal Orchestration
-                <button className="text-[#475569] font-normal hover:text-[#38bdf8]">#</button>
-              </h2>
-              <p className="text-[14.5px] text-[#94a3b8] leading-relaxed mb-8">
-                ShieldGuard orchestrates five telecom-grade signals in parallel via Nokia's Network as Code platform.
-              </p>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                 {[
-                   { name: 'SIM Swap Detection', api: 'sim-swap', icon: RefreshCw, color: 'text-[#38bdf8]', bg: 'bg-[#38bdf8]/10' },
-                   { name: 'Device Status', api: 'device-status', icon: Smartphone, color: 'text-[#a78bfa]', bg: 'bg-[#a78bfa]/10' },
-                   { name: 'Location Verify', api: 'location-verify', icon: MapPin, color: 'text-[#f87171]', bg: 'bg-[#f87171]/10' },
-                   { name: 'KYC Match', api: 'kyc-match', icon: CheckCircle2, color: 'text-[#34d399]', bg: 'bg-[#34d399]/10' },
-                 ].map(s => (
-                   <div key={s.name} className="p-5 rounded-xl bg-[#111827] border border-[#1e3250] hover:border-[#38bdf8]/30 transition-all">
-                      <div className="flex items-center gap-3 mb-3">
-                         <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center", s.bg)}>
-                            <s.icon className={cn("w-4 h-4", s.color)} />
-                         </div>
-                         <h4 className="text-[14px] font-bold text-[#e2e8f0]">{s.name}</h4>
-                      </div>
-                      <div className="font-mono text-[10px] text-[#475569] uppercase tracking-widest mb-3">API · {s.api}</div>
-                      <div className="space-y-1.5 border-t border-[#1e3250]/40 pt-3">
-                         <div className="flex justify-between text-[12px]"><span className="text-[#475569]">Latency</span><span className="text-[#94a3b8] font-mono">~200ms</span></div>
-                         <div className="flex justify-between text-[12px]"><span className="text-[#475569]">Accuracy</span><span className="text-[#94a3b8] font-mono">Carrier-grade</span></div>
-                      </div>
-                   </div>
-                 ))}
-              </div>
-            </section>
-
-            {/* SIM Swap Precision */}
-            <section id="sim-swap" className="mb-20">
-               <h2 className="text-[22px] font-bold text-[#e2e8f0] flex items-center gap-2 mb-4 pb-2 border-b border-[#1e3250]">
-                SIM Swap Detection
-                <button className="text-[#475569] font-normal hover:text-[#38bdf8]">#</button>
-              </h2>
-              <p className="text-[14.5px] text-[#94a3b8] leading-relaxed mb-6">
-                Queries the mobile operator's HLR/HSS to check if the SIM associated with a number was recently changed.
-              </p>
-              <div className="bg-[#fbbf24]/5 border border-[#fbbf24]/10 rounded-xl p-5 flex gap-4">
-                 <AlertCircle className="w-5 h-5 text-[#fbbf24] flex-shrink-0 mt-0.5" />
-                 <p className="text-[13.5px] text-[#94a3b8]">SIM swap events within the last 24-48 hours are high-probability indicators of Account Takeover (ATO) fraud.</p>
-              </div>
-            </section>
-
-             {/* Trust Engine */}
-             <section id="trust-engine" className="mb-20">
-               <h2 className="text-[22px] font-bold text-[#e2e8f0] flex items-center gap-2 mb-4 pb-2 border-b border-[#1e3250]">
-                Evaluation Engine
-                <button className="text-[#475569] font-normal hover:text-[#38bdf8]">#</button>
-              </h2>
-              <p className="text-[14.5px] text-[#94a3b8] leading-relaxed mb-6">
-                The evaluation engine converts raw CAMARA signals into a normalized 0–100 trust score.
-              </p>
-            </section>
-
-             {/* Trust Scoring */}
-             <section id="trust-scoring" className="mb-20">
-               <h2 className="text-[22px] font-bold text-[#e2e8f0] flex items-center gap-2 mb-4 pb-2 border-b border-[#1e3250]">
-                Trust Scoring
-                <button className="text-[#475569] font-normal hover:text-[#38bdf8]">#</button>
-              </h2>
-              <div className="bg-[#0d1320] border border-[#1e3250] rounded-xl p-6 font-mono text-[13px] leading-relaxed">
-                 <div><span className="text-[#c084fc]">const</span> <span className="text-[#e2e8f0]">weightedScore</span> <span className="text-[#94a3b8]">=</span></div>
-                 <div className="pl-4 mt-2">
-                    (<span className="text-[#e2e8f0]">simSwapRisk</span> * <span className="text-[#fb923c]">0.35</span>) +{'\n'}
-                    (<span className="text-[#e2e8f0]">deviceTrust</span> * <span className="text-[#fb923c]">0.25</span>) +{'\n'}
-                    (<span className="text-[#e2e8f0]">locationMatch</span> * <span className="text-[#fb923c]">0.20</span>) +{'\n'}
-                    (<span className="text-[#e2e8f0]">kycMatch</span> * <span className="text-[#fb923c]">0.20</span>)
-                 </div>
-              </div>
-            </section>
-
-            {/* Decision Thresholds */}
-            <section id="decision-thresholds" className="mb-20">
-               <h2 className="text-[22px] font-bold text-[#e2e8f0] flex items-center gap-2 mb-4 pb-2 border-b border-[#1e3250]">
-                Decision Thresholds
-                <button className="text-[#475569] font-normal hover:text-[#38bdf8]">#</button>
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                 <div className="p-5 rounded-xl bg-[#34d399]/5 border border-[#34d399]/20 text-center">
-                    <div className="text-[11px] font-bold text-[#34d399] uppercase tracking-widest mb-2">ALLOW</div>
-                    <div className="text-[24px] font-black text-[#34d399] mb-1">80–100</div>
-                    <p className="text-[11px] text-[#475569]">Proceed without friction</p>
-                 </div>
-                 <div className="p-5 rounded-xl bg-[#fbbf24]/5 border border-[#fbbf24]/20 text-center">
-                    <div className="text-[11px] font-bold text-[#fbbf24] uppercase tracking-widest mb-2">REVIEW</div>
-                    <div className="text-[24px] font-black text-[#fbbf24] mb-1">50–79</div>
-                    <p className="text-[11px] text-[#475569]">Step-up verification required</p>
-                 </div>
-                 <div className="p-5 rounded-xl bg-[#f87171]/5 border border-[#f87171]/20 text-center">
-                    <div className="text-[11px] font-bold text-[#f87171] uppercase tracking-widest mb-2">BLOCK</div>
-                    <div className="text-[24px] font-black text-[#f87171] mb-1">0–49</div>
-                    <p className="text-[11px] text-[#475569]">Automatic rejection</p>
-                 </div>
-              </div>
-            </section>
-
-            {/* Explainability */}
-            <section id="explainability" className="mb-20">
-               <h2 className="text-[22px] font-bold text-[#e2e8f0] flex items-center gap-2 mb-4 pb-2 border-b border-[#1e3250]">
-                Explainability
-                <button className="text-[#475569] font-normal hover:text-[#38bdf8]">#</button>
-              </h2>
-              <p className="text-[14.5px] text-[#94a3b8] leading-relaxed mb-6">
-                Every decision includes an array of human-readable reasons to help your support teams understand why a transaction was flagged.
-              </p>
-            </section>
-
-             {/* Error Codes Reference */}
-             <section id="error-codes" className="mb-20">
-               <h2 className="text-[22px] font-bold text-[#e2e8f0] flex items-center gap-2 mb-4 pb-2 border-b border-[#1e3250]">
-                Error Codes Reference
-                <button className="text-[#475569] font-normal hover:text-[#38bdf8]">#</button>
-              </h2>
-              <div className="bg-[#111827] border border-[#1e3250] rounded-xl overflow-hidden mt-6">
-                 <table className="w-full text-left border-collapse">
-                    <thead>
-                       <tr className="bg-[#1a2234] border-b border-[#1e3250]">
-                          <th className="px-5 py-3 text-[11px] font-bold text-[#475569] uppercase tracking-wider">Error ID</th>
-                          <th className="px-5 py-3 text-[11px] font-bold text-[#475569] uppercase tracking-wider">Status</th>
-                          <th className="px-5 py-3 text-[11px] font-bold text-[#475569] uppercase tracking-wider">Default Message</th>
-                       </tr>
-                    </thead>
-                    <tbody className="text-[13px] text-[#94a3b8]">
-                       <tr className="border-b border-[#1e3250]/40">
-                          <td className="px-5 py-3 font-mono text-[#f87171]">sg_operator_timeout</td>
-                          <td className="px-5 py-3">504</td>
-                          <td className="px-5 py-3">Telecom network request exceeded 5000ms.</td>
-                       </tr>
-                       <tr className="border-b border-[#1e3250]/40">
-                          <td className="px-5 py-3 font-mono text-[#f87171]">sg_mno_unsupported</td>
-                          <td className="px-5 py-3">422</td>
-                          <td className="px-5 py-3">MNO for this number is not connected to our gateway.</td>
-                       </tr>
-                    </tbody>
-                 </table>
-              </div>
-            </section>
-
-            {/* Rate Limits */}
-            <section id="rate-limits" className="mb-20">
-               <h2 className="text-[22px] font-bold text-[#e2e8f0] flex items-center gap-2 mb-4 pb-2 border-b border-[#1e3250]">
-                Rate Limits
-                <button className="text-[#475569] font-normal hover:text-[#38bdf8]">#</button>
-              </h2>
-              <div className="bg-[#111827] border border-[#1e3250] rounded-xl p-6">
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div>
-                       <h4 className="text-[14px] font-bold text-[#e2e8f0] mb-2">Sandbox Keys</h4>
-                       <p className="text-[13px] text-[#475569]">5 requests / second</p>
-                    </div>
-                    <div>
-                       <h4 className="text-[14px] font-bold text-[#e2e8f0] mb-2">Production (Default)</h4>
-                       <p className="text-[13px] text-[#475569]">50 requests / second</p>
-                    </div>
-                 </div>
-              </div>
-            </section>
-
-          </main>
-
-          {/* Table of Contents - Right Sidebar */}
-          <aside className="hidden xl:block w-[220px] flex-shrink-0 sticky top-[52px] h-[calc(100vh-52px)] overflow-y-auto pt-12 pr-6">
-             <h4 className="text-[10.5px] font-bold text-[#475569] uppercase tracking-[.07em] mb-4">On this page</h4>
-             <nav className="flex flex-col gap-2">
-                {navSections.find(s => s.items.some(i => i.id === activeSection))?.items.map(item => (
-                   <button 
-                    key={item.id}
-                    onClick={() => scrollToSection(item.id)}
-                    className={cn(
-                      "text-[12px] text-left py-1.5 px-3 border-l transition-all truncate",
-                      activeSection === item.id 
-                        ? "text-[#38bdf8] border-[#38bdf8] bg-[#38bdf8]/5 font-medium" 
-                        : "text-[#475569] border-[#1e3250] hover:text-[#94a3b8] hover:border-[#475569]"
-                    )}
-                   >
-                    {item.title}
-                   </button>
-                ))}
-             </nav>
-          </aside>
+            </div>
+          )}
         </div>
-      </div>
-
-      {/* Floating Mobile Sidebar Toggle */}
-      <button 
-        onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-        className="fixed bottom-6 right-6 w-12 h-12 bg-white text-slate-950 rounded-full shadow-2xl z-[100] flex items-center justify-center lg:hidden"
-      >
-        {isSidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-      </button>
+      </main>
     </div>
   );
 };

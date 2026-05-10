@@ -42,6 +42,8 @@ import { DeveloperExperiencePage } from './pages/DeveloperExperiencePage';
 import { QuickstartExperiencePage } from './pages/QuickstartExperiencePage';
 import { DeveloperPlaygroundPage } from './pages/DeveloperPlaygroundPage';
 import { DocumentationPage } from './pages/DocumentationPage';
+import { CaseStudiesPage } from './pages/CaseStudiesPage';
+import { BlogPage } from './pages/BlogPage';
 import { LogicPhoto } from './components/LogicPhoto';
 import { Badge } from './components/ui/badge';
 import { supabase } from './lib/supabase';
@@ -58,9 +60,11 @@ interface NavItem {
 
 // --- Components ---
 
-const Navbar = ({ onOpenFlowBuilder, onOpenDocs, gateAuth, onSignIn }: { 
+const Navbar = ({ onOpenFlowBuilder, onOpenDocs, onOpenCaseStudies, onOpenBlog, gateAuth, onSignIn }: { 
     onOpenFlowBuilder: () => void, 
     onOpenDocs: () => void,
+    onOpenCaseStudies: () => void,
+    onOpenBlog: () => void,
     gateAuth: (target: any) => void,
     onSignIn: () => void
   }) => {
@@ -146,7 +150,13 @@ const Navbar = ({ onOpenFlowBuilder, onOpenDocs, gateAuth, onSignIn }: {
     else if (sub.title === 'Research' || sub.title === 'Careers' || sub.title === 'Pricing' || sub.title === 'API Status') {
        toast.info(`${sub.title} module is coming soon!`);
     }
-    else if (sub.title === 'Blog' || sub.title === 'Changelog' || sub.title === 'Case Studies' || sub.title === 'Contact') {
+    else if (sub.title === 'Blog') {
+      onOpenBlog();
+    }
+    else if (sub.title === 'Case Studies') {
+      onOpenCaseStudies();
+    }
+    else if (sub.title === 'Changelog' || sub.title === 'Contact') {
       toast.info(`${sub.title} module is coming soon!`, {
         description: "We are currently finalizing this section of the platform."
       });
@@ -224,7 +234,7 @@ const Navbar = ({ onOpenFlowBuilder, onOpenDocs, gateAuth, onSignIn }: {
           <div className="flex items-center gap-4">
             <button 
               onClick={openGithubRepo}
-              className="hidden md:flex items-center gap-2 px-4 py-2 text-sm font-medium text-white/50 hover:text-white transition-colors duration-300"
+              className="hidden md:flex items-center gap-2 px-4 py-2 text-sm font-medium text-white/50 hover:text-white transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_10px_25px_rgba(0,0,0,0.3)]"
             >
               <Github className="w-4 h-4" /> GitHub
             </button>
@@ -1226,7 +1236,7 @@ const Footer = ({ onNavigate }: { onNavigate: (path: string) => void }) => {
 import FlowBuilderPage from './pages/FlowBuilderPage';
 
 export default function App() {
-  type AppView = 'landing' | 'experience-choice' | 'quickstart' | 'flow-builder' | 'playground' | 'auth' | 'docs';
+  type AppView = 'landing' | 'experience-choice' | 'quickstart' | 'flow-builder' | 'playground' | 'auth' | 'docs' | 'case-studies' | 'blog';
   const [navigation, setNavigation] = useState<{ history: AppView[]; index: number }>({ history: ['landing'], index: 0 });
   const view = navigation.history[navigation.index];
   const canGoBack = navigation.index > 0;
@@ -1290,6 +1300,8 @@ export default function App() {
   const goToQuickstart = () => gateAuth('quickstart');
   const goToPlayground = () => gateAuth('playground');
   const goToDocs = () => pushView('docs');
+  const goToCaseStudies = () => pushView('case-studies');
+  const goToBlog = () => pushView('blog');
   
   const goToExperienceChoice = () => {
     pushView('experience-choice');
@@ -1325,6 +1337,14 @@ export default function App() {
   if (view === 'docs') {
     return <DocumentationPage onBack={goBack} />;
   }
+  
+  if (view === 'case-studies') {
+    return <CaseStudiesPage onBack={goBack} />;
+  }
+
+  if (view === 'blog') {
+    return <BlogPage onBack={goBack} />;
+  }
 
   if (view === 'experience-choice') {
     return (
@@ -1355,6 +1375,8 @@ export default function App() {
       <Navbar 
         onOpenFlowBuilder={goToExperienceChoice} 
         onOpenDocs={goToDocs} 
+        onOpenCaseStudies={goToCaseStudies}
+        onOpenBlog={goToBlog}
         gateAuth={gateAuth}
         onSignIn={() => pushView('auth')}
       />
@@ -1433,12 +1455,15 @@ export default function App() {
           document.getElementById('vision')?.scrollIntoView({ behavior: 'smooth' });
         }
         else if (link === 'Case Studies') {
-           toast.info("Case Studies module is coming soon!");
+           goToCaseStudies();
+        }
+        else if (link === 'Blog') {
+           goToBlog();
         }
         else if (link === 'Contact') {
            toast.info("Contact support module is coming soon!");
         }
-        else if (link === 'Blog' || link === 'Changelog' || link === 'Research' || link === 'Careers' || link === 'Pricing' || link === 'API Status') {
+        else if (link === 'Changelog' || link === 'Research' || link === 'Careers' || link === 'Pricing' || link === 'API Status') {
            toast.info(`${link} is coming soon!`);
         }
         else if (link === 'GitHub') {
