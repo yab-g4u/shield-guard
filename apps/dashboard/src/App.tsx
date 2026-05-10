@@ -31,7 +31,6 @@ import {
   Menu,
   X,
   RefreshCw,
-  ExternalLink,
   MapPin,
   ScanFace,
   RadioTower,
@@ -371,7 +370,7 @@ const Hero = ({ onOpenFlowBuilder }: { onOpenFlowBuilder: () => void }) => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
-          className="flex flex-col sm:flex-row items-center justify-center gap-5 mb-24"
+          className="flex flex-col sm:flex-row items-center justify-center gap-5 mb-12"
         >
           <button 
             onClick={onOpenFlowBuilder}
@@ -379,20 +378,25 @@ const Hero = ({ onOpenFlowBuilder }: { onOpenFlowBuilder: () => void }) => {
           >
             <span className="flex items-center gap-2">Start Building <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" /></span>
           </button>
-          <button 
-            onClick={onOpenFlowBuilder}
-            className="w-full sm:w-auto px-10 py-5 bg-white/5 border border-white/10 text-white rounded-full font-bold text-lg hover:bg-white/10 transition-all flex items-center justify-center gap-2 backdrop-blur-md"
-          >
-            Live Demo <ExternalLink className="w-4 h-4 opacity-40" />
-          </button>
-          <a
-            href="https://youtu.be/lMdtj3tQHsc?si=bBLd4YNLo_OPmJ0j"
-            target="_blank"
-            rel="noreferrer"
-            className="w-full sm:w-auto px-10 py-5 bg-slate-900/80 border border-white/10 text-white rounded-full font-bold text-lg hover:bg-slate-800 transition-all flex items-center justify-center gap-2"
-          >
-            Watch Demo <ExternalLink className="w-4 h-4 opacity-40" />
-          </a>
+        </motion.div>
+
+        {/* Video Preview */}
+        <motion.div 
+          initial={{ opacity: 0, y: 40, scale: 0.95 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 1, delay: 0.4, ease: "easeOut" }}
+          className="max-w-4xl mx-auto rounded-2xl overflow-hidden border border-white/10 shadow-2xl shadow-blue-500/20 mb-24"
+        >
+          <div className="relative w-full bg-black" style={{ paddingBottom: '56.25%' }}>
+            <iframe
+              className="absolute inset-0 w-full h-full"
+              src="https://www.youtube.com/embed/lMdtj3tQHsc?si=bBLd4YNLo_OPmJ0j&autoplay=0"
+              title="ShieldGuard Demo"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+              style={{ border: 'none' }}
+            />
+          </div>
         </motion.div>
 
         {/* Terminal Code Block */}
@@ -900,16 +904,16 @@ const GlobalIntelligence = () => {
             
             <div className="flex gap-10">
                <div>
-                  <div className="text-3xl font-bold mb-2">142</div>
-                  <div className="text-[10px] font-mono text-white/30 uppercase tracking-widest">Connected Carriers</div>
+                  <div className="text-3xl font-bold mb-2">10+</div>
+                  <div className="text-[10px] font-mono text-white/30 uppercase tracking-widest">Q3 2026: Partner Carriers</div>
                </div>
                <div>
-                  <div className="text-3xl font-bold mb-2">8.4B</div>
-                  <div className="text-[10px] font-mono text-white/30 uppercase tracking-widest">Monthly Signals</div>
+                  <div className="text-3xl font-bold mb-2">1B+</div>
+                  <div className="text-[10px] font-mono text-white/30 uppercase tracking-widest">Q4 2026: Projected Signals</div>
                </div>
                <div>
-                  <div className="text-3xl font-bold mb-2">&lt;140ms</div>
-                  <div className="text-[10px] font-mono text-white/30 uppercase tracking-widest">Avg Latency</div>
+                  <div className="text-3xl font-bold mb-2">&lt;100ms</div>
+                  <div className="text-[10px] font-mono text-white/30 uppercase tracking-widest">Target: Avg Latency</div>
                </div>
             </div>
           </motion.div>
