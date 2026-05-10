@@ -81,7 +81,7 @@ export const FlowCanvasContent = () => {
   }, [setSelectedNode]);
 
   return (
-    <div className="flex-1 relative h-full bg-[#0A0F1E]" ref={canvasRef}>
+    <div className="flex-1 relative h-full bg-[#030303]" ref={canvasRef}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -94,12 +94,12 @@ export const FlowCanvasContent = () => {
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         fitView
-        className="bg-[#0A0F1E]"
+        className="bg-[#030303]"
         minZoom={0.2}
         maxZoom={1.5}
       >
         <Background 
-          color="#1a2540" 
+          color="#1f1f23" 
           gap={25} 
           size={1} 
           variant={BackgroundVariant.Dots} 
@@ -107,13 +107,13 @@ export const FlowCanvasContent = () => {
         
         {nodes.length === 0 && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="max-w-md w-full p-12 rounded-[40px] border-2 border-dashed border-blue-500/10 bg-blue-500/5 flex flex-col items-center text-center">
-               <div className="w-20 h-20 rounded-3xl bg-blue-500/10 flex items-center justify-center mb-8 pulse-glow">
-                  <Shield className="w-10 h-10 text-blue-400" />
+            <div className="max-w-md w-full p-12 rounded-[40px] border-2 border-dashed border-white/15 bg-white/[0.03] flex flex-col items-center text-center">
+               <div className="w-20 h-20 rounded-3xl bg-white/10 flex items-center justify-center mb-8 pulse-glow">
+                  <Shield className="w-10 h-10 text-white" />
                </div>
                <h3 className="text-xl font-bold text-white mb-4">Start your Trust Flow</h3>
                <p className="text-sm text-white/30 mb-8 leading-relaxed">
-                 Drag CAMARA network nodes from the sidebar to build your programmable telecom trust orchestration.
+                   Drag fraud orchestration nodes from the sidebar to build your executable runtime policy.
                </p>
                <div className="flex gap-4">
                  <Button 
@@ -132,7 +132,7 @@ export const FlowCanvasContent = () => {
         <TemplatesModal open={templatesOpen} onOpenChange={setTemplatesOpen} />
 
         <Controls 
-          className="bg-[#131929] border border-white/10 rounded-xl overflow-hidden fill-white"
+          className="bg-[#05070B] border border-white/10 rounded-xl overflow-hidden fill-white"
           showInteractive={false}
         />
         
@@ -141,14 +141,14 @@ export const FlowCanvasContent = () => {
             const cat = node.data?.category;
             return COLORS[cat as keyof typeof COLORS] as string || '#333';
           }}
-          className="bg-[#131929] border border-white/10 rounded-xl !bottom-8 !right-8 shadow-2xl"
-          maskColor="rgba(10, 15, 30, 0.7)"
+          className="bg-[#05070B] border border-white/10 rounded-xl !bottom-8 !right-8 shadow-2xl"
+          maskColor="rgba(4, 4, 6, 0.76)"
           style={{ width: 150, height: 100 }}
         />
         
-        <Panel position="bottom-left" className="bg-black/60 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 mb-8 ml-4">
+        <Panel position="bottom-left" className="bg-black/80 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 mb-8 ml-4">
            <div className="flex items-center gap-3">
-              <Sparkles className="w-3 h-3 text-blue-400 animate-pulse" />
+              <Sparkles className="w-3 h-3 text-white animate-pulse" />
               <span className="text-[10px] font-mono font-bold text-white/40 tracking-widest uppercase">Connection Mode: Active</span>
            </div>
         </Panel>
@@ -156,7 +156,7 @@ export const FlowCanvasContent = () => {
 
       <style>{`
         .react-flow__controls button {
-          background: #131929;
+          background: #05070B;
           border-bottom: 1px solid rgba(255, 255, 255, 0.05);
           color: white;
         }
@@ -167,11 +167,11 @@ export const FlowCanvasContent = () => {
           fill: currentColor;
         }
         .react-flow__minimap {
-           border: 1px solid rgba(0, 212, 255, 0.1) !important;
+          border: 1px solid rgba(255, 255, 255, 0.16) !important;
         }
         @keyframes pulse-glow {
-          0%, 100% { box-shadow: 0 0 20px rgba(59, 130, 246, 0.1); }
-          50% { box-shadow: 0 0 40px rgba(59, 130, 246, 0.3); }
+          0%, 100% { box-shadow: 0 0 20px rgba(255, 255, 255, 0.08); }
+          50% { box-shadow: 0 0 40px rgba(255, 255, 255, 0.18); }
         }
         .pulse-glow {
           animation: pulse-glow 4s infinite ease-in-out;

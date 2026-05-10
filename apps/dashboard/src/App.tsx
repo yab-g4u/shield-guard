@@ -1356,7 +1356,7 @@ export default function App() {
         onOpenFlowBuilder={goToExperienceChoice} 
         onOpenDocs={goToDocs} 
         gateAuth={gateAuth}
-        onSignIn={() => setView('auth')}
+        onSignIn={() => pushView('auth')}
       />
       <div className="relative">
         <Hero onOpenFlowBuilder={goToExperienceChoice} />

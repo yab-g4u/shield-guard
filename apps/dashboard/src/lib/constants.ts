@@ -2,17 +2,17 @@
 import { NodeCategory, CamaraAPI } from '../types/flow.types';
 
 export const COLORS = {
-  trigger: '#FF8C00',
-  telecom_signal: '#00D4FF',
-  condition: '#FFB800',
+  trigger: '#a3a3a3',
+  telecom_signal: '#d4d4d8',
+  condition: '#f59e0b',
   decision: {
-    ALLOW: '#00FF88',
-    VERIFY: '#FFB800',
-    BLOCK: '#FF4444',
+    ALLOW: '#e4e4e7',
+    VERIFY: '#f59e0b',
+    BLOCK: '#ef4444',
   },
-  bg: '#0A0F1E',
-  surface: '#131929',
-  border: 'rgba(0, 212, 255, 0.15)',
+  bg: '#030303',
+  surface: '#0b0b0f',
+  border: 'rgba(255, 255, 255, 0.12)',
 };
 
 export const NODE_DEFINITIONS = [
@@ -33,11 +33,46 @@ export const NODE_DEFINITIONS = [
   },
   {
     type: 'device_status',
-    label: 'Device Status Check',
+    label: 'Device Verification',
     category: 'telecom_signal' as NodeCategory,
     camaraApi: 'device_status' as CamaraAPI,
     description: 'Verify if the device is currently reported lost or stolen.',
     icon: 'Smartphone',
+  },
+  {
+    type: 'velocity_check',
+    label: 'Velocity Check',
+    category: 'condition' as NodeCategory,
+    description: 'Detect abnormal transaction burst and temporal anomalies.',
+    icon: 'Zap',
+  },
+  {
+    type: 'geo_risk',
+    label: 'Geo Risk Analysis',
+    category: 'condition' as NodeCategory,
+    description: 'Evaluate corridor and geolocation mismatch risk.',
+    icon: 'MapPin',
+  },
+  {
+    type: 'tx_threshold',
+    label: 'Transaction Threshold',
+    category: 'condition' as NodeCategory,
+    description: 'Branch logic when transaction amount crosses configured threshold.',
+    icon: 'AlertTriangle',
+  },
+  {
+    type: 'risk_aggregator',
+    label: 'Risk Score Aggregator',
+    category: 'condition' as NodeCategory,
+    description: 'Aggregate rule and signal scores into final risk vector.',
+    icon: 'GitBranch',
+  },
+  {
+    type: 'ai_fraud_detection',
+    label: 'AI Fraud Detection',
+    category: 'condition' as NodeCategory,
+    description: 'Run ML-assisted fraud score enrichment and confidence weighting.',
+    icon: 'Shield',
   },
   {
     type: 'number_verify',
@@ -88,11 +123,27 @@ export const NODE_DEFINITIONS = [
   },
   {
     type: 'verify',
-    label: 'Verify (Step-up)',
+    label: 'Step-Up Authentication',
     category: 'decision' as NodeCategory,
     decisionType: 'VERIFY',
     description: 'Require additional authentication (OTP/MFA).',
     icon: 'AlertTriangle',
+  },
+  {
+    type: 'webhook_trigger',
+    label: 'Webhook Trigger',
+    category: 'decision' as NodeCategory,
+    decisionType: 'VERIFY',
+    description: 'Notify external anti-fraud, SIEM, or SOC systems.',
+    icon: 'Globe',
+  },
+  {
+    type: 'session_restriction',
+    label: 'Session Restriction',
+    category: 'decision' as NodeCategory,
+    decisionType: 'BLOCK',
+    description: 'Temporarily restrict account or active user session.',
+    icon: 'XCircle',
   },
   {
     type: 'block',

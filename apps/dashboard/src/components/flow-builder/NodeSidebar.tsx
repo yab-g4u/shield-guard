@@ -35,18 +35,18 @@ export const NodeSidebar = () => {
   };
 
   const categories = [
-    { id: 'trigger', label: 'TRIGGERS', color: '#FF8C00' },
-    { id: 'telecom_signal', label: 'TELECOM SIGNALS', color: '#00D4FF' },
-    { id: 'condition', label: 'LOGIC', color: '#FFB800' },
-    { id: 'decision', label: 'DECISIONS', color: '#00FF88' },
+    { id: 'trigger', label: 'TRIGGERS', color: '#d4d4d8' },
+    { id: 'telecom_signal', label: 'TELECOM SIGNALS', color: '#f4f4f5' },
+    { id: 'condition', label: 'LOGIC', color: '#f59e0b' },
+    { id: 'decision', label: 'DECISIONS', color: '#ef4444' },
   ];
 
   return (
-    <div className="w-[280px] h-full bg-[#131929] border-r border-[#00D4FF]/10 flex flex-col flex-shrink-0 z-10 transition-all duration-300">
-      <div className="p-6 border-b border-white/5 bg-[#0D1424]">
+    <div className="w-[280px] h-full bg-[#07080d] border-r border-white/10 flex flex-col flex-shrink-0 z-10 transition-all duration-300">
+      <div className="p-6 border-b border-white/10 bg-[#05060a]">
         <div className="flex items-center gap-3 mb-6">
-          <div className="p-2 rounded-lg bg-blue-500/10 border border-blue-500/20">
-            <Shield className="w-5 h-5 text-blue-400" />
+          <div className="p-2 rounded-lg bg-white/5 border border-white/10">
+            <Shield className="w-5 h-5 text-white" />
           </div>
           <h2 className="text-sm font-black tracking-widest text-white uppercase">Trust Nodes</h2>
         </div>

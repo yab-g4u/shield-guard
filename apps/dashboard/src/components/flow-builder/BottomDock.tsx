@@ -43,11 +43,11 @@ export const BottomDock = () => {
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 20, opacity: 0 }}
-            className="fixed bottom-[100px] left-1/2 -translate-x-1/2 w-full max-w-5xl h-[500px] bg-[#131929]/95 backdrop-blur-2xl border border-white/5 rounded-3xl shadow-[0_30px_100px_rgba(0,0,0,0.8)] z-50 overflow-hidden flex flex-col"
+            className="fixed bottom-[100px] left-1/2 -translate-x-1/2 w-full max-w-5xl h-[500px] bg-[#05070B]/95 backdrop-blur-2xl border border-white/10 rounded-3xl shadow-[0_30px_100px_rgba(0,0,0,0.8)] z-50 overflow-hidden flex flex-col"
           >
             <div className="p-6 border-b border-white/5 flex items-center justify-between bg-black/20">
               <div className="flex items-center gap-4">
-                 <div className="p-2 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400">
+                 <div className="p-2 rounded-xl bg-white/5 border border-white/10 text-white">
                     {(() => {
                       const Icon = tabs.find(t => t.id === activeTab)?.icon || GitBranch;
                       return <Icon className="w-5 h-5" />;
@@ -85,7 +85,7 @@ export const BottomDock = () => {
                 onClick={() => setActiveTab(isActive ? null : tab.id)}
                 className={cn(
                   "relative flex items-center gap-3 px-5 py-3 rounded-[20px] transition-all duration-300 group",
-                  isActive ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-white/40 hover:text-white hover:bg-white/5"
+                  isActive ? "bg-white text-black shadow-lg shadow-white/20" : "text-white/40 hover:text-white hover:bg-white/5"
                 )}
               >
                 <Icon className={cn("w-4 h-4", isActive ? "animate-pulse" : "")} />

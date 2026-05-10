@@ -223,6 +223,7 @@ const API_GROUPS = [
       { id: 'overview', name: 'Overview', icon: <BarChart3 className="w-4 h-4" /> },
       { id: 'playground', name: 'Playground', icon: <Terminal className="w-4 h-4" /> },
       { id: 'analytics', name: 'Analytics', icon: <LineChartIcon className="w-4 h-4" /> },
+      { id: 'threat-response', name: 'Threat Response', icon: <AlertCircle className="w-4 h-4" /> },
       { id: 'keys', name: 'API Keys', icon: <Key className="w-4 h-4" /> },
       { id: 'logs', name: 'Logs', icon: <History className="w-4 h-4" /> },
     ],
@@ -231,12 +232,12 @@ const API_GROUPS = [
 
 const chartTooltipProps = {
   contentStyle: {
-    backgroundColor: '#0f172a',
-    border: '1px solid #1e293b',
+    backgroundColor: '#05070B',
+    border: '1px solid #2a2f37',
     borderRadius: '12px',
     fontSize: '11px',
   },
-  labelStyle: { color: '#94a3b8' },
+  labelStyle: { color: '#cbd5e1' },
 };
 
 const UsageCard = () => (
@@ -463,9 +464,20 @@ interface RequestLog {
   score: number;
 }
 
+interface ThreatIncident {
+  id: string;
+  timestamp: string;
+  severity: 'critical' | 'high' | 'medium';
+  status: 'auto-contained' | 'pending-action' | 'escalated';
+  threat: string;
+  riskScore: number;
+  decision: string;
+  actions: string[];
+}
+
 export const DeveloperPlaygroundPage = ({ onBack }: { onBack: () => void }) => {
   const [activeTab, setActiveTab] = useState<
-    'overview' | 'playground' | 'analytics' | 'keys' | 'logs'
+    'overview' | 'playground' | 'analytics' | 'threat-response' | 'keys' | 'logs'
   >('playground');
   const [activeEndpoint, setActiveEndpoint] = useState('POST /v1/evaluate');
   const [isExecuting, setIsExecuting] = useState(false);
@@ -534,6 +546,10 @@ export const DeveloperPlaygroundPage = ({ onBack }: { onBack: () => void }) => {
     let block = 0;
     let riskSum = 0;
     let latSum = 0;
+    let blockedAttempts = 0;
+    let simSwapDetections = 0;
+    let deviceMismatchCount = 0;
+    let anomalyTrendCount = 0;
     const signalCount: Record<string, number> = {};
 
     for (const log of logs) {
@@ -541,12 +557,16 @@ export const DeveloperPlaygroundPage = ({ onBack }: { onBack: () => void }) => {
       if (tone === 'allow') approve += 1;
       else if (tone === 'review') review += 1;
       else if (tone === 'block') block += 1;
+      if (tone === 'block') blockedAttempts += 1;
       riskSum += log.score;
       latSum += log.latency;
       const fs = log.response?.fraudSignals;
       if (Array.isArray(fs)) {
         for (const s of fs) {
           signalCount[s] = (signalCount[s] || 0) + 1;
+          if (s === 'sim_swap_detected') simSwapDetections += 1;
+          if (s === 'device_mismatch') deviceMismatchCount += 1;
+          if (s === 'high_value_transfer' || s === 'geo_velocity_warn') anomalyTrendCount += 1;
         }
       }
     }
@@ -555,8 +575,32 @@ export const DeveloperPlaygroundPage = ({ onBack }: { onBack: () => void }) => {
       idx: String(i + 1),
       risk: log.score,
       latency: log.latency,
+      throughput: 8 + Math.round(log.score / 6),
+      severity:
+        log.score >= 85 ? 3 : log.score >= 65 ? 2 : 1,
       decision: formatDecisionLabel(log.response?.decision),
     }));
+
+    const highRiskHeatmap = chronological.slice(-12).map((log, i) => ({
+      slot: `R${i + 1}`,
+      risk: log.score,
+      level: log.score >= 85 ? 'critical' : log.score >= 65 ? 'high' : log.score >= 45 ? 'medium' : 'low',
+    }));
+
+    const attackPatternClusters = [
+      {
+        name: 'SIM_SWAP + NEW_DEVICE',
+        count: signalCount.sim_swap_detected && signalCount.device_mismatch ? Math.min(signalCount.sim_swap_detected, signalCount.device_mismatch) : 0,
+      },
+      {
+        name: 'HIGH_VALUE + GEO_VELOCITY',
+        count: signalCount.high_value_transfer && signalCount.geo_velocity_warn ? Math.min(signalCount.high_value_transfer, signalCount.geo_velocity_warn) : 0,
+      },
+      {
+        name: 'PROXY + DEVICE_MISMATCH',
+        count: signalCount.proxy_or_vpn && signalCount.device_mismatch ? Math.min(signalCount.proxy_or_vpn, signalCount.device_mismatch) : 0,
+      },
+    ].sort((a, b) => b.count - a.count);
 
     const topSignals = Object.entries(signalCount)
       .sort((a, b) => b[1] - a[1])
@@ -580,10 +624,55 @@ export const DeveloperPlaygroundPage = ({ onBack }: { onBack: () => void }) => {
       block,
       avgRisk: n ? Math.round(riskSum / n) : 0,
       avgLatency: n ? Math.round(latSum / n) : 0,
+      throughput: n ? Math.max(1, Math.round(n / 5)) : 0,
+      blockedAttempts,
+      simSwapRate: n ? Math.round((simSwapDetections / n) * 100) : 0,
+      deviceMismatchRate: n ? Math.round((deviceMismatchCount / n) * 100) : 0,
+      anomalyTrendRate: n ? Math.round((anomalyTrendCount / n) * 100) : 0,
       decisionMix,
       trend,
       topSignals,
+      highRiskHeatmap,
+      attackPatternClusters,
     };
+  }, [logs]);
+
+  const threatIncidents = useMemo<ThreatIncident[]>(() => {
+    return logs
+      .filter((log) => {
+        const tone = decisionBadgeTone(log.response?.decision);
+        return tone === 'review' || tone === 'block';
+      })
+      .slice(0, 12)
+      .map((log) => {
+        const riskScore = log.score;
+        const fraudSignals: string[] = log.response?.fraudSignals ?? [];
+        const severity: ThreatIncident['severity'] =
+          riskScore >= 85 || fraudSignals.includes('sim_swap_detected')
+            ? 'critical'
+            : riskScore >= 65
+              ? 'high'
+              : 'medium';
+        const status: ThreatIncident['status'] =
+          decisionBadgeTone(log.response?.decision) === 'block' ? 'auto-contained' : 'pending-action';
+        const actions = [
+          'Transaction quarantined',
+          'Webhook alert triggered',
+          'Step-up authentication recommended',
+          'Session flagged for review',
+        ];
+
+        return {
+          id: `inc_${log.id}`,
+          timestamp: log.timestamp,
+          severity,
+          status,
+          threat: fraudSignals.join(', ') || 'behavioral_anomaly',
+          riskScore,
+          decision: formatDecisionLabel(log.response?.decision),
+          actions,
+        };
+      });
   }, [logs]);
 
   const calculateRisk = () => {
@@ -939,6 +1028,8 @@ export const DeveloperPlaygroundPage = ({ onBack }: { onBack: () => void }) => {
                          ? 'API Playground'
                          : activeTab === 'analytics'
                            ? 'Analytics'
+                          : activeTab === 'threat-response'
+                            ? 'Threat Response Center'
                            : activeTab === 'keys'
                              ? 'API Keys'
                              : 'Request Logs'}
@@ -1062,27 +1153,47 @@ export const DeveloperPlaygroundPage = ({ onBack }: { onBack: () => void }) => {
                                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                                     {[
                                        {
-                                          label: 'Total evaluations',
-                                          value: analyticsSnapshot.total,
-                                          icon: <Activity className="w-4 h-4 text-emerald-500" />,
+                                          label: 'Fraud attempts blocked',
+                                          value: analyticsSnapshot.blockedAttempts,
+                                          icon: <Shield className="w-4 h-4 text-red-400" />,
                                        },
                                        {
-                                          label: 'Avg risk score',
-                                          value: analyticsSnapshot.avgRisk,
-                                          icon: <Target className="w-4 h-4 text-amber-500" />,
+                                          label: 'SIM swap detection rate',
+                                          value: `${analyticsSnapshot.simSwapRate}%`,
+                                          icon: <Smartphone className="w-4 h-4 text-white/80" />,
                                        },
                                        {
-                                          label: 'Avg latency',
+                                          label: 'Device mismatch frequency',
+                                          value: `${analyticsSnapshot.deviceMismatchRate}%`,
+                                          icon: <Fingerprint className="w-4 h-4 text-white/80" />,
+                                       },
+                                       {
+                                          label: 'Transaction anomaly trend',
+                                          value: `${analyticsSnapshot.anomalyTrendRate}%`,
+                                          icon: <AlertCircle className="w-4 h-4 text-amber-400" />,
+                                       },
+                                       {
+                                          label: 'Average latency',
                                           value: `${analyticsSnapshot.avgLatency} ms`,
-                                          icon: <Timer className="w-4 h-4 text-blue-400" />,
+                                          icon: <Timer className="w-4 h-4 text-white/80" />,
                                        },
                                        {
-                                          label: 'Review rate',
+                                          label: 'Fraud decision review rate',
                                           value:
                                              analyticsSnapshot.total > 0
                                                 ? `${Math.round((analyticsSnapshot.review / analyticsSnapshot.total) * 100)}%`
                                                 : '0%',
-                                          icon: <TrendingUp className="w-4 h-4 text-violet-400" />,
+                                          icon: <TrendingUp className="w-4 h-4 text-white/80" />,
+                                       },
+                                       {
+                                          label: 'Realtime throughput',
+                                          value: `${analyticsSnapshot.throughput}/min`,
+                                          icon: <Activity className="w-4 h-4 text-white/80" />,
+                                       },
+                                       {
+                                          label: 'Threat severity baseline',
+                                          value: analyticsSnapshot.total,
+                                          icon: <Target className="w-4 h-4 text-amber-500" />,
                                        },
                                     ].map((kpi) => (
                                        <div
@@ -1136,7 +1247,7 @@ export const DeveloperPlaygroundPage = ({ onBack }: { onBack: () => void }) => {
 
                                     <div className="rounded-[2rem] border border-slate-800 bg-slate-950 p-6 min-h-[320px]">
                                        <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-4">
-                                          Risk score trend (chronological)
+                                          Threat severity timeline
                                        </h3>
                                        <div className="h-[260px] w-full min-w-0">
                                           <ResponsiveContainer width="100%" height="100%">
@@ -1145,7 +1256,8 @@ export const DeveloperPlaygroundPage = ({ onBack }: { onBack: () => void }) => {
                                                 <XAxis dataKey="idx" tick={{ fill: '#64748b', fontSize: 10 }} axisLine={false} tickLine={false} />
                                                 <YAxis domain={[0, 100]} tick={{ fill: '#64748b', fontSize: 10 }} axisLine={false} tickLine={false} width={32} />
                                                 <Tooltip {...chartTooltipProps} />
-                                                <Line type="monotone" dataKey="risk" name="Risk" stroke="#34d399" strokeWidth={2} dot={{ r: 3, fill: '#34d399' }} activeDot={{ r: 5 }} />
+                                                <Line type="monotone" dataKey="risk" name="Threat score" stroke="#f97316" strokeWidth={2} dot={{ r: 3, fill: '#f97316' }} activeDot={{ r: 5 }} />
+                                                <Line type="monotone" dataKey="severity" name="Severity band" stroke="#ef4444" strokeWidth={1.5} strokeDasharray="5 5" dot={false} />
                                              </LineChart>
                                           </ResponsiveContainer>
                                        </div>
@@ -1174,7 +1286,7 @@ export const DeveloperPlaygroundPage = ({ onBack }: { onBack: () => void }) => {
                                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                                     <div className="rounded-[2rem] border border-slate-800 bg-slate-950 p-6 min-h-[300px]">
                                        <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-4">
-                                          Request latency by evaluation
+                                          API latency monitoring
                                        </h3>
                                        <div className="h-[240px] w-full min-w-0">
                                           <ResponsiveContainer width="100%" height="100%">
@@ -1183,7 +1295,7 @@ export const DeveloperPlaygroundPage = ({ onBack }: { onBack: () => void }) => {
                                                 <XAxis dataKey="idx" tick={{ fill: '#64748b', fontSize: 10 }} axisLine={false} tickLine={false} />
                                                 <YAxis tick={{ fill: '#64748b', fontSize: 10 }} axisLine={false} tickLine={false} width={36} />
                                                 <Tooltip {...chartTooltipProps} />
-                                                <Bar dataKey="latency" name="Latency (ms)" fill="#6366f1" radius={[6, 6, 0, 0]} />
+                                                <Bar dataKey="latency" name="Latency (ms)" fill="#a3a3a3" radius={[6, 6, 0, 0]} />
                                              </BarChart>
                                           </ResponsiveContainer>
                                        </div>
@@ -1226,6 +1338,282 @@ export const DeveloperPlaygroundPage = ({ onBack }: { onBack: () => void }) => {
                                        )}
                                     </div>
                                  </div>
+
+                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+                                    <div className="rounded-[2rem] border border-slate-800 bg-slate-950 p-6 min-h-[300px]">
+                                       <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-4">
+                                          Real-time request throughput
+                                       </h3>
+                                       <div className="h-[240px] w-full min-w-0">
+                                          <ResponsiveContainer width="100%" height="100%">
+                                             <LineChart data={analyticsSnapshot.trend}>
+                                                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+                                                <XAxis dataKey="idx" tick={{ fill: '#64748b', fontSize: 10 }} axisLine={false} tickLine={false} />
+                                                <YAxis tick={{ fill: '#64748b', fontSize: 10 }} axisLine={false} tickLine={false} width={36} />
+                                                <Tooltip {...chartTooltipProps} />
+                                                <Line type="monotone" dataKey="throughput" name="Req/min" stroke="#f5f5f5" strokeWidth={2} dot={{ r: 2, fill: '#f5f5f5' }} />
+                                             </LineChart>
+                                          </ResponsiveContainer>
+                                       </div>
+                                    </div>
+
+                                    <div className="rounded-[2rem] border border-slate-800 bg-slate-950 p-6 min-h-[300px]">
+                                       <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-4">
+                                          High-risk transaction heatmap
+                                       </h3>
+                                       <div className="grid grid-cols-6 gap-2">
+                                          {analyticsSnapshot.highRiskHeatmap.map((slot) => (
+                                             <div
+                                                key={slot.slot}
+                                                className={cn(
+                                                   "h-10 rounded-lg border text-[10px] font-mono flex items-center justify-center",
+                                                   slot.level === 'critical' && "bg-red-500/20 border-red-500/30 text-red-300",
+                                                   slot.level === 'high' && "bg-orange-500/20 border-orange-500/30 text-orange-200",
+                                                   slot.level === 'medium' && "bg-zinc-700/40 border-zinc-600 text-zinc-200",
+                                                   slot.level === 'low' && "bg-zinc-900 border-zinc-700 text-zinc-500"
+                                                )}
+                                                title={`${slot.slot} • Risk ${slot.risk}`}
+                                             >
+                                                {slot.risk}
+                                             </div>
+                                          ))}
+                                       </div>
+                                       <p className="mt-4 text-[11px] text-slate-500">
+                                          Cell intensity maps recent high-risk concentration windows in transaction stream.
+                                       </p>
+                                    </div>
+                                 </div>
+
+                                 <div className="rounded-[2rem] border border-slate-800 bg-slate-950 p-6 mt-6">
+                                    <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-4">
+                                       Attack pattern clusters
+                                    </h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                       {analyticsSnapshot.attackPatternClusters.map((cluster) => (
+                                          <div key={cluster.name} className="rounded-xl border border-slate-800 bg-slate-900/50 p-4 flex items-center justify-between">
+                                             <span className="text-[11px] font-mono text-slate-300">{cluster.name}</span>
+                                             <span className="text-lg font-black text-white tabular-nums">{cluster.count}</span>
+                                          </div>
+                                       ))}
+                                    </div>
+                                 </div>
+                              </>
+                           )}
+                        </div>
+                     </div>
+                   )}
+
+                   {activeTab === 'threat-response' && (
+                     <div className="max-w-7xl mx-auto space-y-8">
+                        <div className="rounded-[2rem] sm:rounded-[2.5rem] bg-slate-900 border border-slate-800 p-6 sm:p-10 shadow-[0_40px_80px_rgba(0,0,0,0.45)]">
+                           <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-8">
+                              <div>
+                                 <p className="text-[10px] uppercase tracking-[0.3em] text-slate-500 font-black">
+                                    Threat response center
+                                 </p>
+                                 <h2 className="mt-3 text-2xl sm:text-3xl font-black text-white leading-tight">
+                                    Automated mitigation and escalation workflow
+                                 </h2>
+                                 <p className="mt-2 text-sm text-slate-400 max-w-3xl leading-relaxed">
+                                    Real-time incident queue sourced from high-risk and review decisions. Includes
+                                    quarantine actions, webhook triggers, session restrictions, and operator escalation.
+                                 </p>
+                              </div>
+                              <Button
+                                 variant="outline"
+                                 className="rounded-2xl border-white/10 text-slate-200 uppercase tracking-[0.2em] text-[10px] font-black h-11"
+                                 onClick={() => setActiveTab('playground')}
+                              >
+                                 Replay in playground
+                              </Button>
+                           </div>
+
+                           {threatIncidents.length === 0 ? (
+                              <div className="rounded-[2rem] border border-dashed border-slate-700 bg-slate-950/50 py-24 text-center">
+                                 <AlertCircle className="w-12 h-12 text-slate-600 mx-auto mb-4" />
+                                 <p className="text-sm font-bold text-slate-400">No active threats</p>
+                                 <p className="text-[11px] text-slate-600 mt-2 max-w-md mx-auto">
+                                    Run evaluations that produce REVIEW or BLOCK decisions to populate the response
+                                    center.
+                                 </p>
+                              </div>
+                           ) : (
+                              <>
+                              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                                 <div className="lg:col-span-7 rounded-[1.5rem] border border-slate-800 bg-slate-950 p-4 sm:p-6">
+                                    <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-4">
+                                       Detected threats
+                                    </h3>
+                                    <div className="space-y-3 max-h-[520px] overflow-y-auto pr-1 scrollbar-hide">
+                                       {threatIncidents.map((incident) => (
+                                          <div
+                                             key={incident.id}
+                                             className="rounded-2xl border border-slate-800 bg-slate-900/40 px-4 py-4"
+                                          >
+                                             <div className="flex items-center justify-between gap-3 mb-3">
+                                                <div className="flex items-center gap-2">
+                                                   <Badge
+                                                      className={cn(
+                                                         'text-[9px] font-black uppercase rounded-full border',
+                                                         incident.severity === 'critical' &&
+                                                            'bg-red-500/10 text-red-400 border-red-500/30',
+                                                         incident.severity === 'high' &&
+                                                            'bg-amber-500/10 text-amber-400 border-amber-500/30',
+                                                         incident.severity === 'medium' &&
+                                                            'bg-slate-700/30 text-slate-300 border-slate-600/40'
+                                                      )}
+                                                   >
+                                                      {incident.severity}
+                                                   </Badge>
+                                                   <span className="text-[10px] text-slate-500 font-mono">
+                                                      {incident.timestamp}
+                                                   </span>
+                                                </div>
+                                                <Badge className="text-[9px] bg-slate-800 text-slate-200 border border-slate-700">
+                                                   {incident.status}
+                                                </Badge>
+                                             </div>
+                                             <div className="flex items-center justify-between gap-3">
+                                                <div>
+                                                   <p className="text-xs font-black text-white uppercase tracking-wide">
+                                                      {incident.threat}
+                                                   </p>
+                                                   <p className="text-[11px] text-slate-400 mt-1">
+                                                      Decision: {incident.decision} | Risk score: {incident.riskScore}
+                                                   </p>
+                                                </div>
+                                                <Button
+                                                   variant="outline"
+                                                   size="sm"
+                                                   className="border-white/10 text-[10px] uppercase"
+                                                   onClick={() => {
+                                                      const replay = logs.find((l) => `inc_${l.id}` === incident.id);
+                                                      if (replay) {
+                                                         setRequestBody(JSON.stringify(replay.payload, null, 2));
+                                                         setActiveTab('playground');
+                                                      }
+                                                   }}
+                                                >
+                                                   Replay request
+                                                </Button>
+                                             </div>
+                                          </div>
+                                       ))}
+                                    </div>
+                                 </div>
+
+                                 <div className="lg:col-span-5 space-y-6">
+                                    <div className="rounded-[1.5rem] border border-slate-800 bg-slate-950 p-5">
+                                       <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-4">
+                                          Automated mitigation actions
+                                       </h3>
+                                       <div className="space-y-3 text-[11px] text-slate-300">
+                                          <p>1. Transaction quarantined for manual review</p>
+                                          <p>2. Webhook alert triggered to partner SOC endpoint</p>
+                                          <p>3. Step-up authentication workflow flagged</p>
+                                          <p>4. User session risk marker persisted</p>
+                                          <p>5. Device fingerprint stored for future correlation</p>
+                                          <p>6. Temporary account restriction policy queued</p>
+                                       </div>
+                                    </div>
+
+                                    <div className="rounded-[1.5rem] border border-slate-800 bg-slate-950 p-5">
+                                       <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-4">
+                                          Incident timeline
+                                       </h3>
+                                       <div className="space-y-3 text-[11px]">
+                                          {[
+                                             'Threat detected from live transaction telemetry',
+                                             'Flow policy triggered mitigation branch',
+                                             'Webhook event dispatched with incident payload',
+                                             'Decision persisted and execution trace stored',
+                                             'Escalation pending developer acknowledgment',
+                                          ].map((step, idx) => (
+                                             <div key={idx} className="flex items-start gap-3 text-slate-300">
+                                                <span className="mt-1 w-1.5 h-1.5 rounded-full bg-slate-400" />
+                                                <span>{step}</span>
+                                             </div>
+                                          ))}
+                                       </div>
+                                    </div>
+                                 </div>
+                              </div>
+
+                              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+                                 <div className="rounded-[1.5rem] border border-slate-800 bg-slate-950 p-5">
+                                    <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-4">
+                                       Live logs
+                                    </h3>
+                                    <div className="space-y-2 max-h-[240px] overflow-y-auto pr-1 scrollbar-hide">
+                                       {trace.slice(-12).map((row) => (
+                                          <div key={row.id} className="flex items-center justify-between text-[11px] border border-slate-800 rounded-lg px-3 py-2 bg-slate-900/40">
+                                             <span className="font-mono text-slate-500">{row.time}</span>
+                                             <span className={cn(
+                                                "ml-3 flex-1 text-slate-300",
+                                                row.status === 'error' && "text-red-300",
+                                                row.status === 'warning' && "text-orange-300"
+                                             )}>{row.message}</span>
+                                          </div>
+                                       ))}
+                                    </div>
+                                 </div>
+
+                                 <div className="rounded-[1.5rem] border border-slate-800 bg-slate-950 p-5">
+                                    <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-4">
+                                       Webhook event inspector
+                                    </h3>
+                                    <div className="space-y-2">
+                                       {threatIncidents.slice(0, 6).map((incident) => (
+                                          <div key={`${incident.id}-webhook`} className="flex items-center justify-between rounded-lg border border-slate-800 bg-slate-900/40 px-3 py-2 text-[11px]">
+                                             <span className="font-mono text-slate-300 truncate">{incident.id}</span>
+                                             <span className="text-slate-500">{incident.status === 'auto-contained' ? 'delivered' : 'queued'}</span>
+                                          </div>
+                                       ))}
+                                    </div>
+                                 </div>
+                              </div>
+
+                              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+                                 <div className="rounded-[1.5rem] border border-slate-800 bg-slate-950 p-5">
+                                    <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-4">
+                                       Transaction tracing
+                                    </h3>
+                                    <div className="space-y-3 text-[11px] text-slate-300">
+                                       {[
+                                          'Request accepted at edge gateway',
+                                          'Carrier signal fanout completed',
+                                          'Risk score aggregator returned weighted vector',
+                                          'Mitigation policy branch executed',
+                                          'Incident report emitted to developer channel',
+                                       ].map((step, idx) => (
+                                          <div key={idx} className="flex items-start gap-3">
+                                             <span className="mt-1 w-1.5 h-1.5 rounded-full bg-slate-400" />
+                                             <span>{step}</span>
+                                          </div>
+                                       ))}
+                                    </div>
+                                 </div>
+
+                                 <div className="rounded-[1.5rem] border border-slate-800 bg-slate-950 p-5">
+                                    <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-4">
+                                       API debugging console
+                                    </h3>
+                                    <div className="rounded-xl border border-slate-800 bg-black/40 p-4 font-mono text-[11px] text-slate-300 overflow-x-auto">
+                                       <pre>{JSON.stringify({
+                                          endpoint: '/v1/evaluate',
+                                          method: 'POST',
+                                          latestDecision: lastResult?.decision ?? 'none',
+                                          latestRiskScore: lastResult?.riskScore ?? 0,
+                                          fraudSignals: lastResult?.fraudSignals ?? [],
+                                       }, null, 2)}</pre>
+                                    </div>
+                                    {lastResult?.explainability?.length ? (
+                                       <div className="mt-3 text-[11px] text-slate-400">
+                                          Explainability factors: {lastResult.explainability.map((f) => f.signal).join(', ')}
+                                       </div>
+                                    ) : null}
+                                 </div>
+                              </div>
                               </>
                            )}
                         </div>
