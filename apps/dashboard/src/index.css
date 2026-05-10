@@ -54,6 +54,7 @@
   }
   html {
     @apply font-sans;
+    scroll-behavior: smooth;
   }
 }
 
@@ -81,6 +82,38 @@
 }
 ::-webkit-scrollbar-thumb {
   @apply bg-white/10 rounded-full hover:bg-white/20 transition-colors;
+}
+
+.ops-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+.ops-scroll::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+
+.ops-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.ops-scroll::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 999px;
+  transition: background-color 200ms ease;
+}
+
+.ops-scroll:hover {
+  scrollbar-color: rgba(209, 209, 209, 0.35) transparent;
+}
+
+.ops-scroll:hover::-webkit-scrollbar-thumb {
+  background: linear-gradient(
+    to bottom,
+    rgba(209, 209, 209, 0.42),
+    rgba(130, 131, 131, 0.42)
+  );
 }
 
 @theme inline {

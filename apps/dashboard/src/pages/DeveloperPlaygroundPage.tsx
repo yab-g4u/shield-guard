@@ -82,7 +82,7 @@ import {
 import { gsap } from 'gsap';
 import { toast } from 'sonner';
 import { cn } from '../lib/utils';
-import { GlobeComponent } from '../components/GlobeComponent';
+import { GlobeComponent, ThreatArc, ThreatHotspot } from '../components/GlobeComponent';
 
 import { geminiService } from '../services/geminiService';
 
@@ -675,6 +675,63 @@ export const DeveloperPlaygroundPage = ({ onBack }: { onBack: () => void }) => {
       });
   }, [logs]);
 
+  const globeIntel = useMemo(() => {
+    const geoAnchors = [
+      { region: 'Nairobi, KE', lat: -1.286389, lng: 36.817223 },
+      { region: 'Lagos, NG', lat: 6.524379, lng: 3.379206 },
+      { region: 'London, UK', lat: 51.5074, lng: -0.1278 },
+      { region: 'Dubai, AE', lat: 25.2048, lng: 55.2708 },
+      { region: 'Mumbai, IN', lat: 19.076, lng: 72.8777 },
+      { region: 'New York, US', lat: 40.7128, lng: -74.006 },
+    ];
+
+    const recent = logs.slice(0, 16);
+    const arcs: ThreatArc[] = recent.map((log, idx) => {
+      const source = geoAnchors[idx % geoAnchors.length];
+      const target = geoAnchors[(idx + 2) % geoAnchors.length];
+      const tone = decisionBadgeTone(log.response?.decision);
+      const severity: ThreatArc['severity'] =
+        tone === 'block' ? 'blocked' : tone === 'review' ? 'suspicious' : 'normal';
+      return {
+        startLat: source.lat,
+        startLng: source.lng,
+        endLat: target.lat,
+        endLng: target.lng,
+        severity,
+        value: log.score,
+      };
+    });
+
+    const regionScores = new Map<string, { region: string; lat: number; lng: number; score: number; count: number }>();
+    recent.forEach((log, idx) => {
+      const anchor = geoAnchors[idx % geoAnchors.length];
+      const current = regionScores.get(anchor.region) || { ...anchor, score: 0, count: 0 };
+      current.score += log.score;
+      current.count += 1;
+      regionScores.set(anchor.region, current);
+    });
+
+    const hotspots: ThreatHotspot[] = Array.from(regionScores.values()).map((r) => ({
+      lat: r.lat,
+      lng: r.lng,
+      label: r.region,
+      intensity: Math.min(1, (r.score / Math.max(1, r.count)) / 100),
+    }));
+
+    const topRegions = hotspots
+      .slice()
+      .sort((a, b) => b.intensity - a.intensity)
+      .slice(0, 4);
+
+    return {
+      arcs,
+      hotspots,
+      topRegions,
+      liveTxPerSec: Math.max(3, Math.round((analyticsSnapshot.throughput || 1) / 4)),
+      blockedNow: recent.filter((l) => decisionBadgeTone(l.response?.decision) === 'block').length,
+    };
+  }, [logs, analyticsSnapshot.throughput]);
+
   const calculateRisk = () => {
     let score = 5;
     if (simulator.simSwap) score += 45;
@@ -933,7 +990,7 @@ export const DeveloperPlaygroundPage = ({ onBack }: { onBack: () => void }) => {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-[#020617] text-slate-200 overflow-hidden selection:bg-emerald-500/30 selection:text-white">
+    <div className="ops-theme flex flex-col h-screen bg-[#030303] text-slate-200 overflow-hidden selection:bg-[#d1d1d1]/30 selection:text-white">
       {/* Top Header */}
       <header className="h-20 shrink-0 border-b border-slate-800/50 flex items-center justify-between px-8 bg-[#020617] z-30">
         <div className="flex items-center gap-12">
@@ -983,7 +1040,7 @@ export const DeveloperPlaygroundPage = ({ onBack }: { onBack: () => void }) => {
             </div>
           </div>
           
-          <ScrollArea className="flex-1">
+          <ScrollArea className="flex-1 ops-scroll">
              <div className="py-2">
               {API_GROUPS.map((group) => (
                 <div key={group.name} className="mb-8 px-4">
@@ -1038,7 +1095,7 @@ export const DeveloperPlaygroundPage = ({ onBack }: { onBack: () => void }) => {
               <div className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">Sandbox environment</div>
            </div>
 
-           <ScrollArea className="flex-1">
+           <ScrollArea className="flex-1 ops-scroll">
               <div className="p-4 sm:p-6 md:p-8 pb-24 md:pb-32 min-w-0">
 
                 <div className="space-y-10 sm:space-y-12">
@@ -1115,7 +1172,7 @@ export const DeveloperPlaygroundPage = ({ onBack }: { onBack: () => void }) => {
                    )}
 
                    {activeTab === 'analytics' && (
-                     <div className="max-w-7xl mx-auto space-y-8">
+                     <div className="max-w-7xl mx-auto space-y-8 max-h-[calc(100vh-220px)] overflow-y-auto ops-scroll pr-2">
                         <div className="rounded-[2rem] sm:rounded-[2.5rem] bg-slate-900 border border-slate-800 p-6 sm:p-10 shadow-[0_40px_80px_rgba(0,0,0,0.45)]">
                            <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-8">
                               <div>
@@ -1264,22 +1321,51 @@ export const DeveloperPlaygroundPage = ({ onBack }: { onBack: () => void }) => {
                                     </div>
                                  </div>
 
-                                 <div className="rounded-[2rem] border border-slate-800 bg-slate-950 p-6 mb-8">
-                                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+                                 <div className="rounded-[2rem] border border-slate-800 bg-[#030303] p-6 mb-8">
+                                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-5">
                                        <div>
                                           <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-2">
-                                             Global call origin map
+                                             Global threat intelligence
                                           </h3>
-                                          <p className="text-[11px] text-slate-500 max-w-2xl">
-                                             Visualize where evaluation events originate across the globe using simulated telecom network calls.
+                                          <p className="text-[11px] text-slate-400 max-w-2xl">
+                                             Live 3D telemetry for transaction traffic, suspicious corridors, blocked attacks, and fraud concentration hotspots.
                                           </p>
                                        </div>
                                        <span className="text-[10px] uppercase tracking-[0.3em] text-slate-500 font-black">
-                                          Network footprint
+                                          Operational grid
                                        </span>
                                     </div>
-                                    <div className="h-[360px] rounded-[1.75rem] overflow-hidden border border-slate-800 bg-slate-950">
-                                       <GlobeComponent />
+                                    <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+                                       <div className="xl:col-span-8 h-[420px] rounded-[1.75rem] overflow-hidden border border-slate-800 bg-[#030303]">
+                                          <GlobeComponent arcs={globeIntel.arcs} hotspots={globeIntel.hotspots} />
+                                       </div>
+                                       <div className="xl:col-span-4 space-y-3 xl:sticky xl:top-6 h-fit">
+                                          <div className="rounded-2xl border border-slate-800 bg-black/40 px-4 py-3">
+                                             <p className="text-[10px] uppercase tracking-widest text-slate-500">Live transactions/sec</p>
+                                             <p className="text-2xl font-black text-white tabular-nums mt-1">{globeIntel.liveTxPerSec}</p>
+                                          </div>
+                                          <div className="rounded-2xl border border-slate-800 bg-black/40 px-4 py-3">
+                                             <p className="text-[10px] uppercase tracking-widest text-slate-500">Blocked attacks (window)</p>
+                                             <p className="text-2xl font-black text-red-300 tabular-nums mt-1">{globeIntel.blockedNow}</p>
+                                          </div>
+                                          <div className="rounded-2xl border border-slate-800 bg-black/40 px-4 py-3">
+                                             <p className="text-[10px] uppercase tracking-widest text-slate-500">Active mitigation flows</p>
+                                             <p className="text-2xl font-black text-white tabular-nums mt-1">{Math.max(1, threatIncidents.length)}</p>
+                                          </div>
+                                          <div className="rounded-2xl border border-slate-800 bg-black/40 px-4 py-3">
+                                             <p className="text-[10px] uppercase tracking-widest text-slate-500 mb-2">Top affected regions</p>
+                                             <div className="space-y-2 max-h-[110px] overflow-y-auto ops-scroll">
+                                                {globeIntel.topRegions.map((region) => (
+                                                   <div key={`${region.lat}-${region.lng}`} className="flex items-center justify-between text-[11px]">
+                                                      <span className="text-slate-300 truncate">{region.label}</span>
+                                                      <span className="text-slate-500 tabular-nums">
+                                                         {Math.round(region.intensity * 100)}%
+                                                      </span>
+                                                   </div>
+                                                ))}
+                                             </div>
+                                          </div>
+                                       </div>
                                     </div>
                                  </div>
 
@@ -1310,7 +1396,7 @@ export const DeveloperPlaygroundPage = ({ onBack }: { onBack: () => void }) => {
                                              No fraud signals recorded in logs yet.
                                           </p>
                                        ) : (
-                                          <ul className="space-y-3 max-h-[240px] overflow-y-auto pr-1 scrollbar-hide">
+                                          <ul className="space-y-3 max-h-[240px] overflow-y-auto pr-1 ops-scroll">
                                              {analyticsSnapshot.topSignals.map((row) => (
                                                 <li
                                                    key={row.raw}
@@ -1404,7 +1490,7 @@ export const DeveloperPlaygroundPage = ({ onBack }: { onBack: () => void }) => {
                    )}
 
                    {activeTab === 'threat-response' && (
-                     <div className="max-w-7xl mx-auto space-y-8">
+                     <div className="max-w-7xl mx-auto space-y-8 max-h-[calc(100vh-220px)] overflow-y-auto ops-scroll pr-2">
                         <div className="rounded-[2rem] sm:rounded-[2.5rem] bg-slate-900 border border-slate-800 p-6 sm:p-10 shadow-[0_40px_80px_rgba(0,0,0,0.45)]">
                            <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-8">
                               <div>
@@ -1444,7 +1530,7 @@ export const DeveloperPlaygroundPage = ({ onBack }: { onBack: () => void }) => {
                                     <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-4">
                                        Detected threats
                                     </h3>
-                                    <div className="space-y-3 max-h-[520px] overflow-y-auto pr-1 scrollbar-hide">
+                                    <div className="space-y-3 max-h-[520px] overflow-y-auto pr-1 ops-scroll">
                                        {threatIncidents.map((incident) => (
                                           <div
                                              key={incident.id}
@@ -1544,7 +1630,7 @@ export const DeveloperPlaygroundPage = ({ onBack }: { onBack: () => void }) => {
                                     <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-4">
                                        Live logs
                                     </h3>
-                                    <div className="space-y-2 max-h-[240px] overflow-y-auto pr-1 scrollbar-hide">
+                                    <div className="space-y-2 max-h-[240px] overflow-y-auto pr-1 ops-scroll">
                                        {trace.slice(-12).map((row) => (
                                           <div key={row.id} className="flex items-center justify-between text-[11px] border border-slate-800 rounded-lg px-3 py-2 bg-slate-900/40">
                                              <span className="font-mono text-slate-500">{row.time}</span>
@@ -1629,7 +1715,7 @@ export const DeveloperPlaygroundPage = ({ onBack }: { onBack: () => void }) => {
                                  <h2 className="mt-3 text-3xl font-black text-white">Recent evaluation traffic</h2>
                               </div>
                            </div>
-                           <div className="rounded-[3rem] border border-slate-800 overflow-hidden bg-slate-950/80">
+                           <div className="rounded-[3rem] border border-slate-800 overflow-hidden bg-slate-950/80 max-h-[560px] overflow-y-auto ops-scroll">
                               <table className="w-full border-collapse">
                                  <thead className="bg-slate-900/40 border-b border-slate-800 text-[10px] font-black text-slate-600 uppercase tracking-widest">
                                     <tr>
@@ -1685,7 +1771,7 @@ export const DeveloperPlaygroundPage = ({ onBack }: { onBack: () => void }) => {
                    )}
 
                    {activeTab === 'playground' && (
-                     <div className="max-w-[1600px] mx-auto space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                     <div className="max-w-[1600px] mx-auto space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700 max-h-[calc(100vh-220px)] overflow-y-auto ops-scroll pr-2">
                   <p className="text-[11px] text-slate-400 leading-relaxed max-w-3xl">
                     For example, here we&apos;re simulating a{' '}
                     <span className="text-slate-200 font-bold">SIM swap attack</span>, a{' '}
@@ -1755,7 +1841,7 @@ export const DeveloperPlaygroundPage = ({ onBack }: { onBack: () => void }) => {
                                      backgroundColor: 'transparent',
                                      lineNumbers: 'on',
                                      padding: { top: 10 },
-                                     scrollbar: { vertical: 'hidden' },
+                                     scrollbar: { vertical: 'auto' },
                                      overviewRulerLanes: 0,
                                      hideCursorInOverviewRuler: true,
                                      renderLineHighlight: 'none',
@@ -1776,7 +1862,7 @@ export const DeveloperPlaygroundPage = ({ onBack }: { onBack: () => void }) => {
                                    </div>
                                  )}
                               </div>
-                              <div className="h-[400px] rounded-[2.5rem] bg-slate-900 border border-slate-800 overflow-hidden p-8 font-mono text-[13px] text-blue-400/90 leading-relaxed overflow-y-auto shadow-2xl scrollbar-hide">
+                              <div className="h-[400px] rounded-[2.5rem] bg-slate-900 border border-slate-800 overflow-hidden p-8 font-mono text-[13px] text-blue-400/90 leading-relaxed overflow-y-auto shadow-2xl ops-scroll">
                                  {lastResult ? (
                                     <pre className="selection:bg-emerald-500/30">{JSON.stringify(lastResult, null, 2)}</pre>
                                  ) : (
@@ -2055,7 +2141,7 @@ export const DeveloperPlaygroundPage = ({ onBack }: { onBack: () => void }) => {
                            View Logs <ArrowRight className="w-3.5 h-3.5" />
                         </Button>
                      </div>
-                     <div className="rounded-[3rem] border border-slate-800 overflow-hidden bg-slate-950/80 shadow-[0_0_80px_rgba(0,0,0,0.5)] transition-all hover:bg-slate-950">
+                     <div className="rounded-[3rem] border border-slate-800 overflow-hidden bg-slate-950/80 shadow-[0_0_80px_rgba(0,0,0,0.5)] transition-all hover:bg-slate-950 max-h-[560px] overflow-y-auto ops-scroll">
                         <table className="w-full border-collapse">
                            <thead className="bg-slate-900/40 border-b border-slate-800 text-[10px] font-black text-slate-600 uppercase tracking-widest">
                               <tr>
@@ -2153,6 +2239,24 @@ export const DeveloperPlaygroundPage = ({ onBack }: { onBack: () => void }) => {
           </div>
         </div>
       </footer>
+      <style>{`
+        .ops-theme .bg-\\[\\#020617\\] { background-color: #030303 !important; }
+        .ops-theme .bg-slate-950 { background-color: #030303 !important; }
+        .ops-theme .bg-slate-900 { background-color: #141414 !important; }
+        .ops-theme .bg-slate-800 { background-color: #2b2b2b !important; }
+        .ops-theme .border-slate-800 { border-color: #434343 !important; }
+        .ops-theme .text-slate-600 { color: #828383 !important; }
+        .ops-theme .text-slate-500 { color: #828383 !important; }
+        .ops-theme .text-slate-400 { color: #d1d1d1 !important; opacity: 0.86; }
+        .ops-theme .text-slate-300 { color: #d1d1d1 !important; }
+        .ops-theme .text-slate-200 { color: #d1d1d1 !important; }
+        .ops-theme .text-emerald-500,
+        .ops-theme .text-emerald-400 { color: #d1d1d1 !important; }
+        .ops-theme .bg-emerald-500 { background-color: #d1d1d1 !important; color: #030303 !important; }
+        .ops-theme .bg-emerald-500\\/10 { background-color: rgba(209,209,209,0.12) !important; }
+        .ops-theme .border-emerald-500\\/20 { border-color: rgba(209,209,209,0.2) !important; }
+        .ops-theme .shadow-\\[0_0_8px_\\#10b981\\] { box-shadow: 0 0 8px rgba(209,209,209,0.25) !important; }
+      `}</style>
     </div>
   );
 };
