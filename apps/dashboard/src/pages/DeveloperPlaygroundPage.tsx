@@ -36,6 +36,8 @@ import {
   TrendingUp,
   Timer,
   Target,
+  Sparkles,
+  Loader2,
 } from 'lucide-react';
 import { Button, buttonVariants } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
@@ -84,7 +86,13 @@ import { toast } from 'sonner';
 import { cn } from '../lib/utils';
 import { GlobeComponent, ThreatArc, ThreatHotspot } from '../components/GlobeComponent';
 
-import { geminiService } from '../services/geminiService';
+import {
+  geminiService,
+  saveUserLlmKey,
+  clearUserLlmKey,
+  USER_LLM_STORAGE_KEY,
+  getRemoteRateLimitStatus,
+} from '../services/geminiService';
 
 // --- Types ---
 
@@ -222,6 +230,7 @@ const API_GROUPS = [
     items: [
       { id: 'overview', name: 'Overview', icon: <BarChart3 className="w-4 h-4" /> },
       { id: 'playground', name: 'Playground', icon: <Terminal className="w-4 h-4" /> },
+      { id: 'copilot', name: 'Dev Agent', icon: <Sparkles className="w-4 h-4" /> },
       { id: 'analytics', name: 'Analytics', icon: <LineChartIcon className="w-4 h-4" /> },
       { id: 'threat-response', name: 'Threat Response', icon: <AlertCircle className="w-4 h-4" /> },
       { id: 'keys', name: 'API Keys', icon: <Key className="w-4 h-4" /> },
@@ -477,7 +486,7 @@ interface ThreatIncident {
 
 export const DeveloperPlaygroundPage = ({ onBack }: { onBack: () => void }) => {
   const [activeTab, setActiveTab] = useState<
-    'overview' | 'playground' | 'analytics' | 'threat-response' | 'keys' | 'logs'
+    'overview' | 'playground' | 'copilot' | 'analytics' | 'threat-response' | 'keys' | 'logs'
   >('playground');
   const [activeEndpoint, setActiveEndpoint] = useState('POST /v1/evaluate');
   const [isExecuting, setIsExecuting] = useState(false);
@@ -520,8 +529,59 @@ export const DeveloperPlaygroundPage = ({ onBack }: { onBack: () => void }) => {
     { id: string; time: string; message: string; status: 'success' | 'error' | 'info' | 'warning'; latency?: string }[]
   >([]);
   const [aiInsight, setAiInsight] = useState<string | null>(null);
+
+  const [copilotMessages, setCopilotMessages] = useState<
+    { id: string; role: 'user' | 'assistant'; content: string }[]
+  >([
+    {
+      id: 'copilot-welcome',
+      role: 'assistant',
+      content:
+        'I am the ShieldGuard Dev Agent. Ask how to shape request JSON, interpret fraudSignals / explainability, wire webhooks, or debug simulator toggles. I use your current sandbox context on each reply.',
+    },
+  ]);
+  const [copilotInput, setCopilotInput] = useState('');
+  const [copilotLoading, setCopilotLoading] = useState(false);
+  const [devAgentKeyDraft, setDevAgentKeyDraft] = useState('');
+  const [showDevAgentKey, setShowDevAgentKey] = useState(false);
   
   const traceEndRef = useRef<HTMLDivElement>(null);
+
+  const sendPlaygroundAgent = async (raw?: string) => {
+    const text = (raw ?? copilotInput).trim();
+    if (!text || copilotLoading) return;
+    const uid = () => `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+    const userTurn = { id: uid(), role: 'user' as const, content: text };
+    const nextThread = [...copilotMessages, userTurn];
+    setCopilotMessages(nextThread);
+    setCopilotInput('');
+    setCopilotLoading(true);
+    try {
+      const history = nextThread.slice(-24).map(({ role, content }) => ({ role, content }));
+      const reply = await geminiService.playgroundAgentChat(history, {
+        env,
+        simulator,
+        lastResult,
+        activeScenario: currentScenario.name,
+        requestBody,
+      });
+      setCopilotMessages((m) => [...m, { id: uid(), role: 'assistant', content: reply }]);
+    } catch (e) {
+      toast.error('Dev Agent request failed');
+      setCopilotMessages((m) => [...m, { id: uid(), role: 'assistant', content: String(e) }]);
+    } finally {
+      setCopilotLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    try {
+      const k = localStorage.getItem(USER_LLM_STORAGE_KEY);
+      if (k) setDevAgentKeyDraft(k);
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   useEffect(() => {
     const savedKeys = localStorage.getItem('sg_api_keys');
@@ -1083,6 +1143,8 @@ export const DeveloperPlaygroundPage = ({ onBack }: { onBack: () => void }) => {
                        ? 'Overview'
                        : activeTab === 'playground'
                          ? 'API Playground'
+                         : activeTab === 'copilot'
+                           ? 'Dev Agent'
                          : activeTab === 'analytics'
                            ? 'Analytics'
                           : activeTab === 'threat-response'
@@ -1770,6 +1832,166 @@ export const DeveloperPlaygroundPage = ({ onBack }: { onBack: () => void }) => {
                      </div>
                    )}
 
+                   {activeTab === 'copilot' && (
+                     <div className="max-w-4xl mx-auto h-[min(72vh,calc(100vh-10rem))] flex flex-col min-h-0">
+                        <div className="rounded-[2.5rem] bg-slate-900 border border-slate-800 p-6 sm:p-8 shadow-[0_40px_80px_rgba(0,0,0,0.45)] flex flex-col flex-1 min-h-0 overflow-hidden">
+                           <div className="flex items-start justify-between gap-4 mb-4 shrink-0">
+                              <div>
+                                 <p className="text-[10px] uppercase tracking-[0.3em] text-slate-500 font-black flex items-center gap-2">
+                                    <Sparkles className="w-4 h-4 text-slate-300" />
+                                    Agentic Dev Helper
+                                 </p>
+                                 <h2 className="mt-2 text-2xl font-black text-white">Integration assistant</h2>
+                                 <p className="mt-2 text-sm text-slate-400 max-w-xl">
+                                    Built-in answers use your simulator toggles, request JSON, and last evaluation. Optionally add a remote LLM API key for richer replies (stored only in this browser).
+                                 </p>
+                              </div>
+                              <Button
+                                 variant="outline"
+                                 size="sm"
+                                 className="shrink-0 rounded-xl border-white/10"
+                                 onClick={() => setActiveTab('playground')}
+                              >
+                                 Back to Playground
+                              </Button>
+                           </div>
+
+                           <button
+                              type="button"
+                              onClick={() => setShowDevAgentKey((v) => !v)}
+                              className="text-left text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-slate-300 mb-2 shrink-0 flex items-center gap-2"
+                           >
+                              <Lock className="w-3.5 h-3.5" />
+                              {showDevAgentKey ? '▼' : '▶'} Optional: remote LLM API key (local only)
+                           </button>
+                           {showDevAgentKey && (
+                              <div className="mb-3 shrink-0 rounded-2xl border border-slate-800 bg-slate-950/80 p-3 space-y-2">
+                                 <input
+                                    type="password"
+                                    autoComplete="off"
+                                    value={devAgentKeyDraft}
+                                    onChange={(e) => setDevAgentKeyDraft(e.target.value)}
+                                    placeholder="Paste key — never leaves your browser"
+                                    className="w-full rounded-xl bg-slate-900 border border-slate-800 px-3 py-2 text-xs outline-none focus:border-emerald-500/40"
+                                 />
+                                 <div className="flex flex-wrap gap-2">
+                                    <Button
+                                       type="button"
+                                       size="sm"
+                                       className="rounded-xl bg-emerald-500 text-slate-950 font-black uppercase text-[10px]"
+                                       onClick={() => {
+                                          saveUserLlmKey(devAgentKeyDraft);
+                                          toast.success(devAgentKeyDraft.trim() ? 'API key saved locally' : 'Cleared');
+                                       }}
+                                    >
+                                       Save
+                                    </Button>
+                                    <Button
+                                       type="button"
+                                       variant="outline"
+                                       size="sm"
+                                       className="rounded-xl border-slate-700 text-[10px] uppercase"
+                                       onClick={() => {
+                                          clearUserLlmKey();
+                                          setDevAgentKeyDraft('');
+                                          toast.success('Removed');
+                                       }}
+                                    >
+                                       Clear
+                                    </Button>
+                                 </div>
+                              </div>
+                           )}
+
+                           <p className="text-[10px] text-slate-500 mb-3 shrink-0">
+                              Remote assistant quota (sliding window):{' '}
+                              {(() => {
+                                 const rl = getRemoteRateLimitStatus();
+                                 return `${rl.used}/${rl.max} per ${Math.round(rl.windowMs / 1000)}s — built-in answers always work without a key.`;
+                              })()}
+                           </p>
+
+                           <div className="flex-1 min-h-[200px] overflow-y-auto ops-scroll rounded-2xl border border-slate-800 bg-slate-950/80 p-4 space-y-4 mb-4">
+                              {copilotMessages.map((msg) => (
+                                 <div
+                                    key={msg.id}
+                                    className={cn('flex gap-3', msg.role === 'user' && 'flex-row-reverse')}
+                                 >
+                                    <div
+                                       className={cn(
+                                          'w-9 h-9 rounded-xl shrink-0 flex items-center justify-center border text-[10px] font-black uppercase',
+                                          msg.role === 'user'
+                                             ? 'bg-slate-800 border-slate-700 text-slate-300'
+                                             : 'bg-emerald-500/10 border-emerald-500/25 text-emerald-400'
+                                       )}
+                                    >
+                                       {msg.role === 'user' ? 'You' : <Sparkles className="w-4 h-4" />}
+                                    </div>
+                                    <div
+                                       className={cn(
+                                          'rounded-2xl px-4 py-3 text-sm leading-relaxed border max-w-[88%]',
+                                          msg.role === 'user'
+                                             ? 'bg-slate-800/80 border-slate-700 text-slate-100'
+                                             : 'bg-slate-900 border-slate-800 text-slate-200'
+                                       )}
+                                    >
+                                       <div className="whitespace-pre-wrap">{msg.content}</div>
+                                    </div>
+                                 </div>
+                              ))}
+                              {copilotLoading && (
+                                 <div className="flex items-center gap-2 text-xs text-slate-500 pl-12">
+                                    <Loader2 className="w-4 h-4 animate-spin text-emerald-400" />
+                                    Agent thinking…
+                                 </div>
+                              )}
+                           </div>
+
+                           <div className="flex flex-wrap gap-2 shrink-0 mb-3">
+                              {[
+                                 'Explain my last evaluation and fraudSignals',
+                                 'Suggest request JSON for sim_swap_detected + device_mismatch',
+                                 'What webhook events should I handle after review?',
+                              ].map((q) => (
+                                 <button
+                                    key={q}
+                                    type="button"
+                                    disabled={copilotLoading}
+                                    onClick={() => void sendPlaygroundAgent(q)}
+                                    className="text-[10px] font-bold px-3 py-2 rounded-full border border-slate-700 bg-slate-950 text-slate-400 hover:text-white hover:border-slate-500 transition-colors disabled:opacity-40 text-left max-w-full"
+                                 >
+                                    {q}
+                                 </button>
+                              ))}
+                           </div>
+
+                           <div className="flex gap-3 shrink-0 items-end">
+                              <textarea
+                                 value={copilotInput}
+                                 onChange={(e) => setCopilotInput(e.target.value)}
+                                 onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                       e.preventDefault();
+                                       void sendPlaygroundAgent();
+                                    }
+                                 }}
+                                 placeholder="Write a message… (works without any API key)"
+                                 rows={3}
+                                 disabled={copilotLoading}
+                                 className="flex-1 min-h-[3rem] max-h-40 resize-y rounded-xl bg-slate-950 border border-slate-800 px-4 py-3 text-sm outline-none focus:border-emerald-500/40 disabled:opacity-50"
+                              />
+                              <Button
+                                 className="h-12 px-6 rounded-xl bg-emerald-500 text-slate-950 font-black uppercase tracking-wide shrink-0 self-stretch sm:self-auto"
+                                 disabled={copilotLoading || !copilotInput.trim()}
+                                 onClick={() => void sendPlaygroundAgent()}
+                              >
+                                 {copilotLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Send'}
+                              </Button>
+                           </div>
+                        </div>
+                     </div>
+                   )}
+
                    {activeTab === 'playground' && (
                      <div className="max-w-[1600px] mx-auto space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700 max-h-[calc(100vh-220px)] overflow-y-auto ops-scroll pr-2">
                   <p className="text-[11px] text-slate-400 leading-relaxed max-w-3xl">
@@ -2095,6 +2317,28 @@ export const DeveloperPlaygroundPage = ({ onBack }: { onBack: () => void }) => {
                               <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-600">Heuristic Signals</h4>
                               <FraudSignalTags fraudSignals={lastResult?.fraudSignals ?? []} />
                            </div>
+
+                           {(aiInsight || lastResult) && (
+                              <div className="pt-10 border-t border-slate-800/50 space-y-3 relative z-10">
+                                 <div className="flex items-center justify-between gap-2">
+                                    <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-600 flex items-center gap-2">
+                                       <Sparkles className="w-3.5 h-3.5 text-slate-400" />
+                                       Copilot insight
+                                    </h4>
+                                    <button
+                                       type="button"
+                                       className="text-[9px] font-black uppercase tracking-widest text-slate-500 hover:text-white"
+                                       onClick={() => setActiveTab('copilot')}
+                                    >
+                                       Open Dev Agent
+                                    </button>
+                                 </div>
+                                 <div className="rounded-2xl border border-slate-800 bg-slate-950/80 p-4 text-[11px] text-slate-300 leading-relaxed max-h-48 overflow-y-auto ops-scroll whitespace-pre-wrap">
+                                    {aiInsight ??
+                                       'Run an evaluation to generate a Copilot summary of this decision (built-in reasoning; optional remote assistant if you add an API key in Dev Agent).'}
+                                 </div>
+                              </div>
+                           )}
 
                            {lastResult && lastResult.explainability.length > 0 && (
                               <div className="pt-10 border-t border-slate-800/50">

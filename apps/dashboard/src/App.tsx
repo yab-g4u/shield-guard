@@ -36,7 +36,8 @@ import {
   RadioTower,
   Fingerprint,
   ShieldCheck,
-  ArrowLeft
+  ArrowLeft,
+  Loader2
 } from 'lucide-react';
 import { DeveloperExperiencePage } from './pages/DeveloperExperiencePage';
 import { QuickstartExperiencePage } from './pages/QuickstartExperiencePage';
@@ -51,6 +52,7 @@ import { GlobeComponent } from './components/GlobeComponent';
 import { Toaster } from 'sonner';
 import LineWaves from './components/LineWaves';
 import { cn } from './lib/utils';
+import { geminiService, saveUserLlmKey, clearUserLlmKey, USER_LLM_STORAGE_KEY } from './services/geminiService';
 
 // --- Types ---
 interface NavItem {
@@ -944,20 +946,93 @@ const GlobalIntelligence = () => {
   );
 };
 
+const COPILOT_SIGNALS = [
+  {
+    type: 'SIM_SWAP',
+    status: 'Blocked',
+    icon: RefreshCw,
+    iconClass: 'text-red-400',
+    message: 'Unauthorized SIM swap detected in Addis Ababa (MNO: Ethio Telecom)',
+  },
+  {
+    type: 'GEO_FENCE',
+    status: 'Review',
+    icon: MapPin,
+    iconClass: 'text-amber-400',
+    message: 'Location mismatch: Transaction initiated from Nairobi, expected Lagos',
+  },
+  {
+    type: 'DEVICE_ID',
+    status: 'Allowed',
+    icon: Smartphone,
+    iconClass: 'text-emerald-400',
+    message: 'Device hardware signature verified. Trust score: 98/100',
+  },
+] as const;
+
 const AICopilotSection = () => {
   const [activeSignal, setActiveSignal] = useState(0);
-  const signals = [
-    { type: 'SIM_SWAP', status: 'Blocked', icon: <RefreshCw className="w-4 h-4 text-red-400" />, message: "Unauthorized SIM swap detected in Addis Ababa (MNO: Ethio Telecom)" },
-    { type: 'GEO_FENCE', status: 'Review', icon: <MapPin className="w-4 h-4 text-amber-400" />, message: "Location mismatch: Transaction initiated from Nairobi, expected Lagos" },
-    { type: 'DEVICE_ID', status: 'Allowed', icon: <Smartphone className="w-4 h-4 text-emerald-400" />, message: "Device hardware signature verified. Trust score: 98/100" }
-  ];
+  const [messages, setMessages] = useState<
+    { id: string; role: 'user' | 'assistant'; content: string }[]
+  >([
+    {
+      id: 'welcome',
+      role: 'assistant',
+      content:
+        "I'm ShieldGuard Copilot. Ask about SIM swap investigations, carrier-backed location mismatches, Flow Builder policies, or how to tune approve / review / block thresholds.",
+    },
+  ]);
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [userApiKeyDraft, setUserApiKeyDraft] = useState('');
+  const [showApiKey, setShowApiKey] = useState(false);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(USER_LLM_STORAGE_KEY);
+      if (stored) setUserApiKeyDraft(stored);
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setActiveSignal((prev) => (prev + 1) % signals.length);
+      setActiveSignal((prev) => (prev + 1) % COPILOT_SIGNALS.length);
     }, 4000);
     return () => clearInterval(interval);
   }, []);
+
+  const sendCopilot = async (raw?: string) => {
+    const text = (raw ?? input).trim();
+    if (!text || loading) return;
+    const uid = () => `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+    setMessages((m) => [...m, { id: uid(), role: 'user', content: text }]);
+    setInput('');
+    setLoading(true);
+    try {
+      const signal = COPILOT_SIGNALS[activeSignal];
+      const reply = await geminiService.askCopilot(text, {
+        section: 'landing-copilot',
+        liveDemoSignal: {
+          type: signal.type,
+          status: signal.status,
+          message: signal.message,
+        },
+      });
+      setMessages((m) => [...m, { id: uid(), role: 'assistant', content: reply }]);
+    } catch (e) {
+      toast.error('Copilot request failed');
+      setMessages((m) => [
+        ...m,
+        { id: uid(), role: 'assistant', content: `Something went wrong: ${String(e)}` },
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const DemoIcon = COPILOT_SIGNALS[activeSignal].icon;
 
   return (
     <section id="copilot" className="py-40 px-6 relative overflow-hidden bg-charcoal/30">
@@ -972,70 +1047,157 @@ const AICopilotSection = () => {
             className="lg:w-1/2 relative"
           >
              <div className="relative z-10 p-1.5 rounded-[40px] bg-gradient-to-br from-blue-500/20 via-white/5 to-transparent">
-              <div className="bg-charcoal rounded-[34px] p-10 border border-white/10 relative overflow-hidden h-[600px] flex flex-col">
-                <div className="flex items-center gap-3 mb-10 pb-6 border-b border-white/5">
+              <div className="bg-charcoal rounded-[34px] p-8 sm:p-10 border border-white/10 relative flex flex-col min-h-[560px] max-h-[85vh]">
+                <div className="flex items-center gap-3 mb-4 pb-4 border-b border-white/5 shrink-0">
                    <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center border border-blue-500/20">
                     <Cpu className="w-5 h-5 text-blue-400" />
                    </div>
                    <div>
                     <h3 className="font-bold text-sm">ShieldGuard Copilot</h3>
-                    <p className="text-[10px] text-white/30 uppercase tracking-widest font-mono">neural-trust-v4</p>
+                    <p className="text-[10px] text-white/30 uppercase tracking-widest font-mono">Live assistant</p>
                    </div>
                 </div>
 
-                <div className="space-y-6 flex-1 overflow-y-auto no-scrollbar pt-4">
-                  <div className="flex gap-4">
-                    <div className="w-8 h-8 rounded-full bg-white/5 flex-shrink-0" />
-                    <div className="bg-white/5 p-4 rounded-2xl rounded-tl-none text-sm text-white/60 leading-relaxed border border-white/5">
-                      Identify root cause for transaction tx_9a82b failing in Nigeria cluster.
+                <button
+                  type="button"
+                  onClick={() => setShowApiKey((v) => !v)}
+                  className="text-left text-[11px] text-white/40 hover:text-white/70 mb-3 shrink-0"
+                >
+                  {showApiKey ? '▼' : '▶'} Optional: remote assistant API key (stored in this browser only)
+                </button>
+                {showApiKey && (
+                  <div className="mb-4 space-y-2 shrink-0 rounded-xl border border-white/10 bg-white/5 p-3">
+                    <input
+                      type="password"
+                      autoComplete="off"
+                      value={userApiKeyDraft}
+                      onChange={(e) => setUserApiKeyDraft(e.target.value)}
+                      placeholder="Paste key — never shared outside your browser"
+                      className="w-full rounded-lg bg-black/40 border border-white/10 px-3 py-2 text-xs outline-none focus:border-blue-500/40"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        className="text-xs px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15"
+                        onClick={() => {
+                          saveUserLlmKey(userApiKeyDraft);
+                          toast.success(userApiKeyDraft.trim() ? 'API key saved locally' : 'Cleared');
+                        }}
+                      >
+                        Save
+                      </button>
+                      <button
+                        type="button"
+                        className="text-xs px-3 py-1.5 rounded-lg border border-white/10 hover:bg-white/5"
+                        onClick={() => {
+                          clearUserLlmKey();
+                          setUserApiKeyDraft('');
+                          toast.success('Removed');
+                        }}
+                      >
+                        Clear
+                      </button>
                     </div>
                   </div>
+                )}
 
-                  <div className="flex gap-4">
-                    <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center flex-shrink-0 border border-blue-500/30">
-                      <Shield className="w-4 h-4 text-blue-400" />
-                    </div>
-                    <div className="bg-blue-500/5 p-5 rounded-2xl rounded-tl-none text-sm text-white/80 leading-relaxed border border-blue-500/10">
-                      <p className="mb-4">Analysis complete. The failure was triggered by a <span className="text-blue-400 font-bold">Location-Inconsistency</span> signal from MT-NGA-Lagos.</p>
-                      
-                      <div className="p-4 rounded-xl bg-charcoal border border-blue-500/20 relative overflow-hidden mb-4">
-                         <div className="flex items-center justify-between mb-3">
-                            <span className="text-[10px] font-black uppercase tracking-widest text-white/40">{signals[activeSignal].type} Analysis</span>
-                            <Badge className={cn(
-                              "text-[8px] px-1.5 py-0",
-                              signals[activeSignal].status === 'Blocked' ? "bg-red-500/10 text-red-400" :
-                              signals[activeSignal].status === 'Review' ? "bg-amber-500/10 text-amber-400" :
-                              "bg-emerald-500/10 text-emerald-400"
-                            )}>
-                              {signals[activeSignal].status}
-                            </Badge>
-                         </div>
-                         <p className="text-xs text-white/80 leading-relaxed">
-                            {signals[activeSignal].message}
-                         </p>
-                         <motion.div 
-                            key={activeSignal}
-                            initial={{ scaleX: 0 }}
-                            animate={{ scaleX: 1 }}
-                            transition={{ duration: 4, ease: "linear" }}
-                            className="absolute bottom-0 left-0 right-0 h-[1.5px] bg-blue-500 origin-left"
-                         />
-                      </div>
-
-                      <p className="mt-4 text-white/40">Recommendation: Automated quarantine initiated.</p>
-                    </div>
+                <div className="p-3 rounded-xl bg-charcoal border border-blue-500/20 mb-4 relative overflow-hidden shrink-0">
+                  <div className="flex items-center justify-between mb-2 gap-2">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-white/40 flex items-center gap-2">
+                      <DemoIcon className={cn('w-3.5 h-3.5', COPILOT_SIGNALS[activeSignal].iconClass)} />
+                      {COPILOT_SIGNALS[activeSignal].type} · live demo
+                    </span>
+                    <Badge className={cn(
+                      'text-[8px] px-1.5 py-0 shrink-0',
+                      COPILOT_SIGNALS[activeSignal].status === 'Blocked' ? 'bg-red-500/10 text-red-400' :
+                      COPILOT_SIGNALS[activeSignal].status === 'Review' ? 'bg-amber-500/10 text-amber-400' :
+                      'bg-emerald-500/10 text-emerald-400'
+                    )}>
+                      {COPILOT_SIGNALS[activeSignal].status}
+                    </Badge>
                   </div>
+                  <p className="text-xs text-white/75 leading-relaxed">{COPILOT_SIGNALS[activeSignal].message}</p>
+                  <motion.div 
+                    key={activeSignal}
+                    initial={{ scaleX: 0 }}
+                    animate={{ scaleX: 1 }}
+                    transition={{ duration: 4, ease: 'linear' }}
+                    className="absolute bottom-0 left-0 right-0 h-[2px] bg-blue-500 origin-left"
+                  />
                 </div>
 
-                <div className="mt-8 pt-6 border-t border-white/5 flex items-center gap-4">
-                  <div className="flex-1 bg-white/5 h-12 rounded-full px-5 flex items-center transition-all border border-white/5 hover:border-white/10 group cursor-text">
-                    <div className="flex items-center gap-2">
-                       <div className="w-1 h-3 bg-blue-500 animate-pulse" />
-                       <span className="text-white/20 text-sm">Analyze next batch...</span>
+                <div className="space-y-4 flex-1 min-h-[200px] max-h-[min(320px,40vh)] overflow-y-auto ops-scroll pr-1 mb-4">
+                  {messages.map((msg) => (
+                    <div key={msg.id} className={cn('flex gap-3', msg.role === 'user' && 'flex-row-reverse')}>
+                      <div className={cn(
+                        'w-8 h-8 rounded-full shrink-0 flex items-center justify-center border text-[10px] font-black',
+                        msg.role === 'user'
+                          ? 'bg-white/10 border-white/10 text-white/70'
+                          : 'bg-blue-500/15 border-blue-500/25 text-blue-300'
+                      )}>
+                        {msg.role === 'user' ? 'You' : <Shield className="w-4 h-4 text-blue-400" />}
+                      </div>
+                      <div className={cn(
+                        'rounded-2xl px-4 py-3 text-sm leading-relaxed border max-w-[88%]',
+                        msg.role === 'user'
+                          ? 'bg-white/5 border-white/10 text-white/85'
+                          : 'bg-blue-500/5 border-blue-500/15 text-white/80'
+                      )}>
+                        <div className="whitespace-pre-wrap">{msg.content}</div>
+                      </div>
                     </div>
-                  </div>
-                  <div className="w-12 h-12 rounded-full bg-blue-500 flex items-center justify-center shadow-lg shadow-blue-500/20 active:scale-95 transition-transform">
-                    <ArrowRight className="w-5 h-5 text-white" />
+                  ))}
+                  {loading && (
+                    <div className="flex items-center gap-2 text-xs text-white/40 pl-11">
+                      <Loader2 className="w-4 h-4 animate-spin text-blue-400" />
+                      Thinking…
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap gap-2 shrink-0 mb-3">
+                  {[
+                    'Explain SIM swap vs device mismatch',
+                    'When should decision be review vs block?',
+                    'Draft a Flow Builder policy for high-value txns',
+                  ].map((q) => (
+                    <button
+                      key={q}
+                      type="button"
+                      disabled={loading}
+                      onClick={() => sendCopilot(q)}
+                      className="text-[10px] font-semibold px-3 py-1.5 rounded-full border border-white/10 bg-white/5 text-white/60 hover:text-white hover:border-white/20 transition-colors disabled:opacity-40"
+                    >
+                      {q}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="mt-auto pt-4 border-t border-white/5 flex flex-col gap-3 shrink-0">
+                  <textarea
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        void sendCopilot();
+                      }
+                    }}
+                    placeholder="Write a message…"
+                    disabled={loading}
+                    rows={3}
+                    className="w-full resize-y min-h-[72px] bg-white/5 rounded-2xl px-4 py-3 text-sm border border-white/10 outline-none focus:border-blue-500/40 disabled:opacity-50"
+                  />
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      disabled={loading || !input.trim()}
+                      onClick={() => void sendCopilot()}
+                      className="inline-flex items-center gap-2 px-5 h-11 rounded-full bg-blue-500 text-white text-sm font-semibold shadow-lg shadow-blue-500/20 active:scale-95 transition-transform disabled:opacity-40"
+                    >
+                      {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
+                      Send
+                    </button>
                   </div>
                 </div>
               </div>
@@ -1071,8 +1233,12 @@ const AICopilotSection = () => {
               ))}
             </div>
 
-            <button className="px-10 py-5 bg-white text-charcoal rounded-full font-bold text-lg hover:bg-neutral-200 transition-all active:scale-95 flex items-center gap-3 shadow-xl shadow-white/5">
-              Meet your Copilot <ArrowRight className="w-5 h-5" />
+            <button
+              type="button"
+              onClick={() => document.getElementById('copilot')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+              className="px-10 py-5 bg-white text-charcoal rounded-full font-bold text-lg hover:bg-neutral-200 transition-all active:scale-95 flex items-center gap-3 shadow-xl shadow-white/5"
+            >
+              Open Copilot <ArrowRight className="w-5 h-5" />
             </button>
           </motion.div>
         </div>
