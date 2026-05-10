@@ -1331,13 +1331,14 @@ export default function App() {
       <DeveloperExperiencePage 
         onSelectFlowBuilder={goToFlowBuilder}
         onSelectQuickstart={goToQuickstart}
-        onSelectPlayground={goToPlayground} 
+        onSelectPlayground={goToPlayground}
+        onBack={goBack}
       />
     );
   }
 
   if (view === 'quickstart') {
-    return <QuickstartExperiencePage onOpenFlowBuilder={goToFlowBuilder} />;
+    return <QuickstartExperiencePage onOpenFlowBuilder={goToFlowBuilder} onBack={goBack} />;
   }
 
   if (view === 'flow-builder') {

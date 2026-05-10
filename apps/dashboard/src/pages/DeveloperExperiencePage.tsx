@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Zap, GitBranch, Terminal, Shield, ArrowRight, Layers, Cpu, Code } from 'lucide-react';
+import { Zap, GitBranch, Terminal, Shield, ArrowRight, Layers, Cpu, Code, ArrowLeft } from 'lucide-react';
 import { Button } from '../components/ui/button';
 
 interface ExperienceCardProps {
@@ -49,11 +49,13 @@ const ExperienceCard: React.FC<ExperienceCardProps> = ({ icon, title, descriptio
 export const DeveloperExperiencePage = ({ 
   onSelectFlowBuilder, 
   onSelectQuickstart, 
-  onSelectPlayground 
+  onSelectPlayground,
+  onBack
 }: { 
   onSelectFlowBuilder: () => void;
   onSelectQuickstart: () => void;
   onSelectPlayground: () => void;
+  onBack: () => void;
 }) => {
   return (
     <div className="min-h-screen bg-[#0A0F1E] text-white flex flex-col p-6 overflow-hidden">
@@ -66,6 +68,12 @@ export const DeveloperExperiencePage = ({
           </div>
           <span className="text-sm font-black tracking-[0.3em] text-white uppercase">ShieldGuard</span>
         </div>
+        <button 
+          onClick={onBack}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-full border border-white/10 bg-white/5 text-sm font-semibold text-white hover:bg-white/10 transition-all"
+        >
+          <ArrowLeft className="w-4 h-4" /> Back
+        </button>
       </header>
       
       <main className="max-w-7xl mx-auto w-full flex-1 flex flex-col justify-center py-20">
