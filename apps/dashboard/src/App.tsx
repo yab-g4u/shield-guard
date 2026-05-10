@@ -116,6 +116,10 @@ const Navbar = ({ onOpenFlowBuilder, onOpenDocs, gateAuth, onSignIn }: {
     }
   ];
 
+  const openGithubRepo = () => {
+    window.open('https://github.com/yab-g4u/shield-guard.git', '_blank', 'noopener,noreferrer');
+  };
+
   const handleLinkClick = (sub: any) => {
     setIsOpen(false);
     if (sub.title === 'Flow Builder') onOpenFlowBuilder();
@@ -137,7 +141,10 @@ const Navbar = ({ onOpenFlowBuilder, onOpenDocs, gateAuth, onSignIn }: {
       const el = document.getElementById('vision');
       el?.scrollIntoView({ behavior: 'smooth' });
     }
-    else if (sub.title === 'GitHub' || sub.title === 'Research' || sub.title === 'Careers' || sub.title === 'Pricing' || sub.title === 'API Status') {
+    else if (sub.title === 'GitHub') {
+      openGithubRepo();
+    }
+    else if (sub.title === 'Research' || sub.title === 'Careers' || sub.title === 'Pricing' || sub.title === 'API Status') {
        toast.info(`${sub.title} module is coming soon!`);
     }
     else if (sub.title === 'Blog' || sub.title === 'Changelog' || sub.title === 'Case Studies' || sub.title === 'Contact') {
@@ -217,7 +224,7 @@ const Navbar = ({ onOpenFlowBuilder, onOpenDocs, gateAuth, onSignIn }: {
 
           <div className="flex items-center gap-4">
             <button 
-              onClick={() => toast.info("Opening GitHub repository...")}
+              onClick={openGithubRepo}
               className="hidden md:flex items-center gap-2 px-4 py-2 text-sm font-medium text-white/50 hover:text-white transition-colors duration-300"
             >
               <Github className="w-4 h-4" /> GitHub
@@ -378,6 +385,14 @@ const Hero = ({ onOpenFlowBuilder }: { onOpenFlowBuilder: () => void }) => {
           >
             Live Demo <ExternalLink className="w-4 h-4 opacity-40" />
           </button>
+          <a
+            href="https://youtu.be/lMdtj3tQHsc?si=bBLd4YNLo_OPmJ0j"
+            target="_blank"
+            rel="noreferrer"
+            className="w-full sm:w-auto px-10 py-5 bg-slate-900/80 border border-white/10 text-white rounded-full font-bold text-lg hover:bg-slate-800 transition-all flex items-center justify-center gap-2"
+          >
+            Watch Demo <ExternalLink className="w-4 h-4 opacity-40" />
+          </a>
         </motion.div>
 
         {/* Terminal Code Block */}
@@ -1207,9 +1222,35 @@ const Footer = ({ onNavigate }: { onNavigate: (path: string) => void }) => {
 import FlowBuilderPage from './pages/FlowBuilderPage';
 
 export default function App() {
-  const [view, setView] = useState<'landing' | 'experience-choice' | 'quickstart' | 'flow-builder' | 'playground' | 'auth' | 'docs'>('landing');
+  type AppView = 'landing' | 'experience-choice' | 'quickstart' | 'flow-builder' | 'playground' | 'auth' | 'docs';
+  const [navigation, setNavigation] = useState<{ history: AppView[]; index: number }>({ history: ['landing'], index: 0 });
+  const view = navigation.history[navigation.index];
+  const canGoBack = navigation.index > 0;
+  const canGoForward = navigation.index < navigation.history.length - 1;
   const [session, setSession] = useState<any>(null);
-  const [pendingView, setPendingView] = useState<'quickstart' | 'flow-builder' | 'playground' | 'docs' | null>(null);
+  const [pendingView, setPendingView] = useState<AppView | null>(null);
+
+  const pushView = (nextView: AppView) => {
+    setNavigation((prev) => {
+      if (prev.history[prev.index] === nextView) return prev;
+      const nextHistory = [...prev.history.slice(0, prev.index + 1), nextView];
+      return { history: nextHistory, index: nextHistory.length - 1 };
+    });
+  };
+
+  const goBack = () => {
+    setNavigation((prev) => {
+      if (prev.index === 0) return prev;
+      return { ...prev, index: prev.index - 1 };
+    });
+  };
+
+  const goForward = () => {
+    setNavigation((prev) => {
+      if (prev.index >= prev.history.length - 1) return prev;
+      return { ...prev, index: prev.index + 1 };
+    });
+  };
 
   useEffect(() => {
     // Check local session for simulation
@@ -1230,11 +1271,11 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, [pendingView]);
 
-  const gateAuth = (target: 'quickstart' | 'flow-builder' | 'playground' | 'docs') => {
+  const gateAuth = (target: AppView) => {
     const localSession = localStorage.getItem('shieldguard_session');
     if (session || localSession) {
       if (localSession && !session) setSession(JSON.parse(localSession));
-      setView(target as any);
+      pushView(target);
     } else {
       setPendingView(target);
       onJoinDemo();
@@ -1244,10 +1285,10 @@ export default function App() {
   const goToFlowBuilder = () => gateAuth('flow-builder');
   const goToQuickstart = () => gateAuth('quickstart');
   const goToPlayground = () => gateAuth('playground');
-  const goToDocs = () => setView('docs');
+  const goToDocs = () => pushView('docs');
   
   const goToExperienceChoice = () => {
-    setView('experience-choice');
+    pushView('experience-choice');
   };
 
   const onJoinDemo = () => {
@@ -1263,10 +1304,10 @@ export default function App() {
     setSession(mockSession as any);
     
     if (pendingView) {
-      setView(pendingView as any);
+      pushView(pendingView);
       setPendingView(null);
     } else {
-      setView('experience-choice');
+      pushView('experience-choice');
     }
     toast.success('Entering ShieldGuard Demo Environment');
   };
@@ -1278,7 +1319,7 @@ export default function App() {
   }
 
   if (view === 'docs') {
-    return <DocumentationPage onBack={() => setView('landing')} />;
+    return <DocumentationPage onBack={goBack} />;
   }
 
   if (view === 'experience-choice') {
@@ -1296,11 +1337,11 @@ export default function App() {
   }
 
   if (view === 'flow-builder') {
-    return <FlowBuilderPage onBack={() => setView('experience-choice')} />;
+    return <FlowBuilderPage onBack={goBack} />;
   }
 
   if (view === 'playground') {
-    return <DeveloperPlaygroundPage onBack={() => setView('experience-choice')} />;
+    return <DeveloperPlaygroundPage onBack={goBack} />;
   }
 
   return (
@@ -1314,6 +1355,24 @@ export default function App() {
       />
       <div className="relative">
         <Hero onOpenFlowBuilder={goToExperienceChoice} />
+        {view !== 'landing' && (
+          <div className="fixed bottom-6 left-6 z-50 flex items-center gap-3">
+            <button
+              onClick={goBack}
+              disabled={!canGoBack}
+              className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-white transition-all disabled:cursor-not-allowed disabled:opacity-40 hover:bg-white/10"
+            >
+              <ArrowLeft className="w-4 h-4" /> Back
+            </button>
+            <button
+              onClick={goForward}
+              disabled={!canGoForward}
+              className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-white transition-all disabled:cursor-not-allowed disabled:opacity-40 hover:bg-white/10"
+            >
+              Forward <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
+        )}
         
         {/* Transitional background elements */}
         <div className="absolute top-[80vh] left-0 w-full h-[200vh] bg-gradient-to-b from-transparent via-accent/[0.03] to-transparent pointer-events-none -z-10" />
@@ -1378,7 +1437,7 @@ export default function App() {
            toast.info(`${link} is coming soon!`);
         }
         else if (link === 'GitHub') {
-           toast.info("Opening GitHub repository...");
+           window.open('https://github.com/yab-g4u/shield-guard.git', '_blank', 'noopener,noreferrer');
         }
       }} />
     </div>

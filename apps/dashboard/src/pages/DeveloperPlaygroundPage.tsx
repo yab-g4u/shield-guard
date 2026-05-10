@@ -82,6 +82,7 @@ import {
 import { gsap } from 'gsap';
 import { toast } from 'sonner';
 import { cn } from '../lib/utils';
+import { GlobeComponent } from '../components/GlobeComponent';
 
 import { geminiService } from '../services/geminiService';
 
@@ -1148,6 +1149,25 @@ export const DeveloperPlaygroundPage = ({ onBack }: { onBack: () => void }) => {
                                              </LineChart>
                                           </ResponsiveContainer>
                                        </div>
+                                    </div>
+                                 </div>
+
+                                 <div className="rounded-[2rem] border border-slate-800 bg-slate-950 p-6 mb-8">
+                                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+                                       <div>
+                                          <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-2">
+                                             Global call origin map
+                                          </h3>
+                                          <p className="text-[11px] text-slate-500 max-w-2xl">
+                                             Visualize where evaluation events originate across the globe using simulated telecom network calls.
+                                          </p>
+                                       </div>
+                                       <span className="text-[10px] uppercase tracking-[0.3em] text-slate-500 font-black">
+                                          Network footprint
+                                       </span>
+                                    </div>
+                                    <div className="h-[360px] rounded-[1.75rem] overflow-hidden border border-slate-800 bg-slate-950">
+                                       <GlobeComponent />
                                     </div>
                                  </div>
 
